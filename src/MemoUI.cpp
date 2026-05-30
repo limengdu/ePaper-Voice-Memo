@@ -385,24 +385,27 @@ void MemoUI::drawCard(int x, int y, int w, int h,
   const int rightW   = 360;
   const int memoMaxW = (x + w - rightPad - rightW) - memoX;
 
-  // ---- Right side: date chip (top) + time or time-of-day label (bottom) ----
+  // ---- Right side: date chip (top) + big time / time-of-day (bottom) ----
   {
     String dateChip, timeBig;
     bool   over = false;
     formatDueLabel(nowEpoch, entry, dateChip, timeBig, over);
 
-    // If a time-of-day label is set (AM/PM/Noon/Eve), use it instead of HH:MM.
-    if (entry.fuzzyLabel.length() > 0) {
-      timeBig = entry.fuzzyLabel;
+    if (entry.fuzzyLabel == "NONE") {
+      timeBig = "";                 // user gave no time -> leave blank
+    } else if (entry.fuzzyLabel.length() > 0) {
+      timeBig = entry.fuzzyLabel;   // time-of-day word (Morning/Evening/...)
     }
 
-    // Date chip (top right).
+    const int rightEdge = x + w - rightPad;
+
+    // Date chip near the top of the card.
     display_.setTextSize(3);
     const int chipPad = 18;
     const int chipH   = 38;
     const int chipW   = display_.textWidth(dateChip) + chipPad * 2;
-    const int chipX   = x + w - rightPad - chipW;
-    const int chipY   = y + 18;
+    const int chipX   = rightEdge - chipW;
+    const int chipY   = y + 16;
     const uint16_t chipFill = overdue ? kUiCardDark
                                : (entry.done ? kUiMuted : kUiBadge);
     display_.fillRoundRect(chipX, chipY, chipW, chipH, 8, chipFill);
@@ -410,11 +413,14 @@ void MemoUI::drawCard(int x, int y, int w, int h,
     display_.setTextColor(kUiTextInv, chipFill, true);
     display_.drawString(dateChip, chipX + chipW / 2, chipY + chipH / 2 - 1);
 
-    // Big time / time-of-day label (bottom right).
-    display_.setTextSize(6);
-    display_.setTextColor(fg, fill, true);
-    display_.setTextDatum(TR_DATUM);
-    display_.drawString(timeBig, x + w - rightPad, y + h - 22 - 48);
+    // Big time anchored to the BOTTOM of the card, so it can never overlap
+    // the chip regardless of card height.
+    if (timeBig.length() > 0) {
+      display_.setTextSize(5);
+      display_.setTextColor(fg, fill, true);
+      display_.setTextDatum(BR_DATUM);
+      display_.drawString(timeBig, rightEdge, y + h - 16);
+    }
   }
 
   // ---- Memo text ----
