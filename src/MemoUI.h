@@ -62,8 +62,11 @@ class MemoUI {
   // hitTestCheckbox() can resolve subsequent taps to a row index.
   void drawTodoList(MemoStore& store,
                     RtcClock& rtc,
-                    const char* status,
+                    const UiStatus& status,
                     const String& hint);
+
+  // One-page boot/splash screen reusing the header.
+  void drawBoot(RtcClock& rtc, const String& statusText, const UiStatus& status);
 
   // Returns 0..kMax-1 if (x, y) falls inside a card's checkbox hit zone
   // from the most recent drawTodoList() call. Returns -1 otherwise.
@@ -96,10 +99,11 @@ class MemoUI {
   void drawWrapped(const String& text, int x, int y, int maxW, int lineH,
                    int textSize, uint16_t color, int maxLines);
 
-  void drawNotebookLogo(int x, int y, int size, uint16_t color);
   void drawClipboardLogo(int x, int y, int size, uint16_t color);
   void drawBatteryIcon(int x, int y, int w, int h, int percent, uint16_t color);
   void drawWifiIcon(int x, int y, int w, int h, bool connected, uint16_t color);
+
+  void drawHeader(RtcClock& rtc, const UiStatus& status);
 };
 
 #endif  // VOICE_MEMO_MEMO_UI_H

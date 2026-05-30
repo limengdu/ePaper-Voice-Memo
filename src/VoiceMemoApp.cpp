@@ -138,7 +138,7 @@ void VoiceMemoApp::begin()
                  false, 0.0f);
   ensureWiFi(15000);
 
-  ui_.drawTodoList(store_, rtc_, "READY",
+  ui_.drawTodoList(store_, rtc_, currentStatus(false),
                    "Hold KEY0 to add. Tap a box to check off.");
 }
 
@@ -172,7 +172,7 @@ void VoiceMemoApp::stopRecording(bool forced)
                  static_cast<unsigned>(audio_.audioBytes()));
 
   if (audio_.tooShort()) {
-    ui_.drawTodoList(store_, rtc_, "TOO SHORT",
+    ui_.drawTodoList(store_, rtc_, currentStatus(false),
                      "Hold KEY0 for at least one second.");
     busy_ = false;
     return;
@@ -190,7 +190,7 @@ void VoiceMemoApp::stopRecording(bool forced)
 
   if (!ensureWiFi(10000)) {
     ledOff();
-    ui_.drawTodoList(store_, rtc_, "NO WIFI",
+    ui_.drawTodoList(store_, rtc_, currentStatus(false),
                      "Reminder skipped because WiFi is unavailable.");
     busy_ = false;
     return;
@@ -216,7 +216,7 @@ void VoiceMemoApp::stopRecording(bool forced)
   const String hint = forced
       ? "Stopped at max length. Hold KEY0 for another memo."
       : "Hold KEY0 to add. Tap a box to check off.";
-  ui_.drawTodoList(store_, rtc_, "UPDATED", hint);
+  ui_.drawTodoList(store_, rtc_, currentStatus(false), hint);
 
   busy_ = false;
 }
@@ -271,7 +271,7 @@ void VoiceMemoApp::pollTouch()
 
   Serial1.printf("[touch] toggle row %d\n", idx);
   store_.toggleDone(static_cast<size_t>(idx));
-  ui_.drawTodoList(store_, rtc_, "UPDATED",
+  ui_.drawTodoList(store_, rtc_, currentStatus(false),
                    "Hold KEY0 to add. Tap a box to check off.");
 }
 

@@ -295,30 +295,6 @@ void MemoUI::drawProcessing(const String& title, const String& body, const Strin
   display_.update();
 }
 
-void MemoUI::drawNotebookLogo(int x, int y, int size, uint16_t color)
-{
-  // Spiral rings: a row of small circles along the top edge.
-  const int ringR = size / 8;
-  const int ringY = y + ringR;
-  const int gaps  = 4;
-  const int step  = size / gaps;
-  for (int i = 0; i < gaps; i++) {
-    display_.drawCircle(x + step / 2 + i * step, ringY, ringR, color);
-  }
-
-  // Notebook body: rounded rectangle below the rings.
-  const int bodyY = y + ringR * 2 + 3;
-  const int bodyH = size - ringR * 2 - 3;
-  display_.drawRoundRect(x, bodyY, size, bodyH, 4, color);
-
-  // Three ruled lines inside the body.
-  const int lineX1 = x + size / 6;
-  const int lineX2 = x + size * 5 / 6;
-  display_.drawFastHLine(lineX1, bodyY + bodyH / 4,     lineX2 - lineX1,           color);
-  display_.drawFastHLine(lineX1, bodyY + bodyH / 2,     lineX2 - lineX1,           color);
-  display_.drawFastHLine(lineX1, bodyY + bodyH * 3 / 4, (lineX2 - lineX1) * 2 / 3, color);
-}
-
 void MemoUI::drawClipboardLogo(int x, int y, int size, uint16_t color)
 {
   // Clip tab at top center.
@@ -488,8 +464,69 @@ void MemoUI::drawCard(int x, int y, int w, int h,
   }
 }
 
+void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
+{
+  const int w = display_.width();
+  const int margin = 80;
+  const int topY = 24;
+
+  // Left column: clipboard logo (top) + "Notes" (bottom).
+  const int logoSize = 56;
+  drawClipboardLogo(margin, topY, logoSize, kUiText);
+  display_.setTextDatum(TL_DATUM);
+  display_.setTextSize(3);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.drawString("Notes", margin, topY + logoSize + 8);
+
+  // Center column: big time (top) + date (bottom), centered.
+  display_.setTextDatum(TC_DATUM);
+  display_.setTextSize(8);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.drawString(rtc.nowTimeLabel(), w / 2, topY);
+  display_.setTextSize(3);
+  display_.drawString(rtc.nowHeaderDateLabel(), w / 2, topY + 8 * 8 + 14);
+
+  // Right column.
+  if (st.processing) {
+    const int cx = w - margin - 18;
+    const int cy = topY + 20;
+    display_.drawCircle(cx, cy, 16, kUiText);
+    display_.fillCircle(cx, cy - 16, 4, kUiText);
+    display_.setTextDatum(MR_DATUM);
+    display_.setTextSize(3);
+    display_.setTextColor(kUiText, kUiBg, true);
+    display_.drawString("Processing", cx - 30, cy);
+  } else {
+    const int battW = 46, battH = 22;
+    const int battX = w - margin - battW - 3;
+    const int battY = topY + 2;
+    drawBatteryIcon(battX, battY, battW, battH, st.batteryPercent, kUiText);
+    display_.setTextDatum(MR_DATUM);
+    display_.setTextSize(2);
+    display_.setTextColor(kUiText, kUiBg, true);
+    char pbuf[8];
+    snprintf(pbuf, sizeof(pbuf), "%d%%", st.batteryPercent < 0 ? 0 : st.batteryPercent);
+    display_.drawString(pbuf, battX - 6, battY + battH / 2);
+
+    const int wifiW = 34, wifiH = 24;
+    drawWifiIcon(w - margin - wifiW, battY + battH + 14, wifiW, wifiH,
+                 st.wifiConnected, kUiText);
+  }
+}
+
+void MemoUI::drawBoot(RtcClock& rtc, const String& statusText, const UiStatus& st)
+{
+  display_.fillSprite(kUiBg);
+  drawHeader(rtc, st);
+  display_.setTextDatum(MC_DATUM);
+  display_.setTextSize(4);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.drawString(statusText, display_.width() / 2, display_.height() / 2);
+  display_.update();
+}
+
 void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
-                          const char* status, const String& hint)
+                          const UiStatus& status, const String& hint)
 {
   const time_t nowEpoch = rtc.nowEpoch();
   store.sortByDue(nowEpoch);
@@ -502,49 +539,10 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   const int h = display_.height();
   const int margin = 80;
 
-  // ---- Header geometry ----
-  const int logoSize = 48;
-  const int logoY    = 20;
-  const int timeY    = logoY + logoSize + 8;      // top of big time text
-  const int dateY    = timeY + 8 * 8 + 8;         // top of date label (textSize 8 ~ 64px)
-  const int headerH  = dateY + 4 * 8 + 16;        // textSize 4 ~ 32px, +margin
-
   display_.fillSprite(kUiBg);
+  drawHeader(rtc, status);
 
-  // ---- Logo + "Notes" (left) ----
-  drawNotebookLogo(margin, logoY, logoSize, kUiText);
-  display_.setTextSize(3);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.setTextDatum(ML_DATUM);
-  display_.drawString("Notes", margin + logoSize + 12, logoY + logoSize / 2);
-
-  // ---- Status badge (right, vertically aligned with logo) ----
-  {
-    display_.setTextSize(3);
-    const int padX = 18;
-    const int bh   = 38;
-    const int bw   = display_.textWidth(status) + padX * 2;
-    const int bx   = w - margin - bw;
-    const int by   = logoY + (logoSize - bh) / 2;
-    display_.fillRoundRect(bx, by, bw, bh, 8, kUiBadge);
-    display_.setTextDatum(MC_DATUM);
-    display_.setTextColor(kUiTextInv, kUiBadge, true);
-    display_.drawString(status, bx + bw / 2, by + bh / 2 - 1);
-  }
-
-  // ---- Big time (centered) ----
-  display_.setTextSize(8);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.setTextDatum(TC_DATUM);
-  display_.drawString(rtc.nowTimeLabel(), w / 2, timeY);
-
-  // ---- Long date label (centered, below time) ----
-  display_.setTextSize(4);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.setTextDatum(TC_DATUM);
-  display_.drawString(rtc.nowLongDateLabel(), w / 2, dateY);
-
-  display_.drawFastHLine(margin, headerH, w - margin * 2, kUiLine);
+  const int headerH = 200;   // header band height (no divider line)
 
   // ---- Card list ----
   const int footerH = 100;
@@ -573,7 +571,7 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   // ---- Footer ----
   display_.setTextDatum(BL_DATUM);
   display_.setTextSize(3);
-  display_.setTextColor(kUiMuted, kUiBg, true);
+  display_.setTextColor(kUiText, kUiBg, true);
   display_.drawString(hint, margin, h - 36);
 
   display_.setTextDatum(BR_DATUM);
@@ -608,7 +606,8 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
       if (i + 1 < store.count()) body += "\n";
     }
   }
-  drawStatus(status, "Reminders", body, hint, false, 0.0f);
+  const char* badge = status.processing ? "Processing" : "Reminders";
+  drawStatus(badge, "Reminders", body, hint, false, 0.0f);
 #endif
 }
 
