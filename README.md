@@ -38,10 +38,15 @@ Supported devices:
 1. Install [PlatformIO](https://platformio.org/).
 2. Copy `include/secrets.example.h` to `src/secrets.h` and fill in your WiFi
    credentials and Groq API key.
-3. Edit `src/driver.h` and verify `VOICE_MEMO_DEVICE_E1003` is selected.
-4. Connect the reTerminal E1003 via USB.
-5. Build and upload: `pio run -e reterminal_e1003 --target upload`
-6. Monitor serial: `pio device monitor`
+3. Connect your reTerminal via USB and build + upload for the matching device:
+   - reTerminal E1001: `pio run -e reterminal_e1001 --target upload`
+   - reTerminal E1002: `pio run -e reterminal_e1002 --target upload`
+   - reTerminal E1003: `pio run -e reterminal_e1003 --target upload`
+4. Monitor serial: `pio device monitor`
+
+The device target is selected by the build environment (the `-D
+VOICE_MEMO_DEVICE_*` flag in `platformio.ini`), so no source edits are needed
+to switch devices.
 
 > **Note:** Upload speed is set to 115200 in `platformio.ini`; higher speeds
 > may fail on the E1003.

@@ -2,6 +2,7 @@
 .pio/
 .pioenvs/
 .piolibdeps/
+.cache/
 
 # Secrets -- never commit real keys
 src/secrets.h
@@ -11,6 +12,7 @@ src/secrets.h
 *.bin
 *.elf
 *.hex
+compile_commands.json
 
 # IDE / editor
 .vscode/
@@ -21,6 +23,10 @@ src/secrets.h
 # OS
 .DS_Store
 Thumbs.db
+
+# Python (gateway)
+__pycache__/
+*.pyc
 
 # Claude local settings
 .claude/settings.local.json
