@@ -51,6 +51,33 @@ to switch devices.
 > **Note:** Upload speed is set to 115200 in `platformio.ini`; higher speeds
 > may fail on the E1003.
 
+## Chinese (Simplified) build
+
+The E1003 has an extra environment, `reterminal_e1003_zh`, that renders the
+entire UI in Simplified Chinese — including the reminder text, which the LLM is
+prompted to return in Chinese regardless of the spoken language. Language is a
+build-time choice (the `-D VM_UI_LANG_ZH` flag): the English and Chinese
+firmwares are separate builds, never switched at runtime.
+
+The Chinese build renders text through OpenFontRender using a TrueType font in
+SPIFFS, so flashing is **two steps**:
+
+```sh
+pio run -e reterminal_e1003_zh -t uploadfs   # writes data/test_ZH.ttf to SPIFFS
+pio run -e reterminal_e1003_zh -t upload     # writes the firmware
+```
+
+Notes:
+
+- The font `data/test_ZH.ttf` is a subset Source-Han font (~833 KB). Characters
+  not in the subset render blank. To use a different font, drop it in `data/`,
+  point the load path in `TextRenderer.cpp` at it, and re-run `-t uploadfs`.
+- Glyph size is controlled by `VM_ZH_PX_PER_UNIT` in `TextRenderer.cpp`; tune it
+  on hardware so Chinese text matches the former bitmap sizes.
+- Switching a device between the English and Chinese firmware clears the saved
+  reminder list on first boot (reminders are stored in one language).
+- The English builds are unchanged and never link OpenFontRender.
+
 ## File map
 
 The example is split into small files so each contributor only has to read
@@ -71,7 +98,10 @@ the module they care about:
 | `TouchMapper.h`         | Header-only helpers for scaling raw touch coordinates to display pixels. |
 | `JsonUtil.h`            | Header-only JSON helpers shared by the two HTTP clients. |
 | `gateway/`              | Optional Python service used for offline testing. |
-| `src/DateLabels.h`      | Header-only pure C++ helpers: `vmDayDistance()` and `vmDateChipLabel()`. |
+| `src/DateLabels.h`      | Header-only pure C++ helpers: `vmDayDistance()` and English/Chinese `vmDateChipLabel()`. |
+| `src/UiLang.h`          | Header-only: compile-time language switch (`VM_LANG_ZH`) and the English/Chinese fixed-string table (`uiStr`). |
+| `src/TextRenderer.*`    | Text rendering facade. English build draws with the Seeed_GFX bitmap font; the Chinese build (`VM_LANG_ZH`) draws with OpenFontRender + a SPIFFS TrueType font. |
+| `src/OfrSpiffs.h`       | SPIFFS file hooks for OpenFontRender (Chinese build only). |
 
 ## Contributing
 
@@ -86,6 +116,7 @@ shows where to look:
 | Tweak the LLM prompt or the memo JSON schema | `MemoClient.cpp` (`summarizeOpenAICompatible`) |
 | Swap NVS for LittleFS or SD card storage | `MemoStore.cpp` — only the private `load()` / `save()` methods |
 | Change e-paper layout / add a new screen | `MemoUI.cpp` |
+| Change how text is rendered, or add a UI language | `TextRenderer.*` and `UiLang.h` |
 | Change sample rate, recording length, or encoding | `AudioCapture.cpp` (and the `audio` block in the .ino config) |
 | Use a different RTC chip | `RtcClock.cpp` |
 | Add a different button or wake mechanism | `VoiceMemoApp.cpp` (`pollButton`) |
@@ -193,6 +224,6 @@ in your fork.
   language, then the memo model rewrites the transcript into English.
 - HTTPS examples use `WiFiClientSecure::setInsecure()` to keep setup simple.
   Production firmware should pin a CA certificate or public key.
-- Built-in Seeed_GFX fonts are best for ASCII UI text. UTF-8 transcript text
-  is preserved by serial logs; for full CJK rendering on screen, load a
-  smooth font that contains the needed glyphs.
+- The English build uses built-in Seeed_GFX bitmap fonts (best for ASCII). For
+  on-screen Chinese, use the `reterminal_e1003_zh` build, which renders through
+  OpenFontRender + a TrueType font in SPIFFS (see "Chinese (Simplified) build").

@@ -22,6 +22,7 @@
 #include "driver.h"
 #include "MemoStore.h"
 #include "RtcClock.h"
+#include "TextRenderer.h"
 #include "TFT_eSPI.h"
 
 // Snapshot of device status drawn in the header.
@@ -80,6 +81,7 @@ class MemoUI {
   };
 
   EPaper display_;
+  TextRenderer renderer_;
   HitRect checkboxHits_[MemoStore::kMax];
 
   // Card layout (E1003).

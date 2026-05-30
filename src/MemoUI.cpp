@@ -61,6 +61,7 @@ void MemoUI::begin()
 #elif VM_SCREEN_MODE == VM_SCREEN_GRAY16
   display_.initGrayMode(GRAY_LEVEL16);
 #endif
+  renderer_.begin(display_);
 }
 
 uint16_t MemoUI::displayWidth()  { return static_cast<uint16_t>(display_.width()); }
@@ -115,10 +116,6 @@ String MemoUI::formatDueLabel(time_t nowEpoch, const MemoEntry& entry,
 void MemoUI::drawWrapped(const String& text, int x, int y, int maxW,
                          int lineH, int textSize, uint16_t color, int maxLines)
 {
-  display_.setTextSize(textSize);
-  display_.setTextColor(color, kUiBg, true);
-  display_.setTextDatum(TL_DATUM);
-
   auto utf8Len = [&](size_t i) -> size_t {
     const uint8_t c = static_cast<uint8_t>(text[i]);
     if ((c & 0x80) == 0) return 1;
@@ -136,14 +133,16 @@ void MemoUI::drawWrapped(const String& text, int x, int y, int maxW,
     i += n;
     if (token == "\r") continue;
     if (token == "\n") {
-      display_.drawString(line, x, y + lines * lineH);
+      renderer_.drawText(line, x, y + lines * lineH, textSize,
+                         TextAlign::TopLeft, color, kUiBg);
       line = "";
       lines++;
       continue;
     }
     const String candidate = line + token;
-    if (line.length() > 0 && display_.textWidth(candidate) > maxW) {
-      display_.drawString(line, x, y + lines * lineH);
+    if (line.length() > 0 && renderer_.measureText(candidate, textSize) > maxW) {
+      renderer_.drawText(line, x, y + lines * lineH, textSize,
+                         TextAlign::TopLeft, color, kUiBg);
       line = token;
       lines++;
     } else {
@@ -151,7 +150,8 @@ void MemoUI::drawWrapped(const String& text, int x, int y, int maxW,
     }
   }
   if (lines < maxLines && line.length() > 0) {
-    display_.drawString(line, x, y + lines * lineH);
+    renderer_.drawText(line, x, y + lines * lineH, textSize,
+                       TextAlign::TopLeft, color, kUiBg);
   }
 }
 
@@ -170,43 +170,36 @@ void MemoUI::drawStatus(const char* badge, const String& title, const String& bo
   display_.fillRect(0, 0, w, topH, kUiCard);
   display_.drawFastHLine(0, topH - 1, w, kUiLine);
 
-  display_.setTextDatum(TL_DATUM);
-  display_.setTextSize(smallSize);
-  display_.setTextColor(kUiText, kUiCard, true);
-  display_.drawString("Voice Memo", margin, topH / 2 - smallSize * 8);
-  display_.setTextColor(kUiMuted, kUiCard, true);
-  display_.drawString(VM_DEVICE_NAME, margin, topH / 2 + smallSize * 2);
+  renderer_.drawText("Voice Memo", margin, topH / 2 - smallSize * 8, smallSize,
+                     TextAlign::TopLeft, kUiText, kUiCard);
+  renderer_.drawText(VM_DEVICE_NAME, margin, topH / 2 + smallSize * 2, smallSize,
+                     TextAlign::TopLeft, kUiMuted, kUiCard);
 
   {
     const int padX = 18;
     const int bh = 36;
-    display_.setTextSize(smallSize);
-    const int bw = display_.textWidth(badge) + padX * 2;
+    const int bw = renderer_.measureText(badge, smallSize) + padX * 2;
     const int bx = w - margin - bw;
     const int by = topH / 2 - bh / 2;
     display_.fillRoundRect(bx, by, bw, bh, 10,
                            recording ? kUiCardDark : kUiBadge);
-    display_.setTextColor(recording ? kUiTextInv : kUiText,
-                          recording ? kUiCardDark : kUiBadge, true);
-    display_.setTextDatum(MC_DATUM);
-    display_.drawString(badge, bx + bw / 2, by + bh / 2 - 1);
+    renderer_.drawText(badge, bx + bw / 2, by + bh / 2 - 1, smallSize,
+                       TextAlign::MiddleCenter,
+                       recording ? kUiTextInv : kUiText,
+                       recording ? kUiCardDark : kUiBadge);
   }
 
-  display_.setTextDatum(TL_DATUM);
-  display_.setTextSize(titleSize);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString(title, margin, topH + margin);
+  renderer_.drawText(title, margin, topH + margin, titleSize,
+                     TextAlign::TopLeft, kUiText, kUiBg);
 
   if (recording) {
     const int cx = w / 2;
     const int cy = (topH + h) / 2;
     for (int r = 36; r <= 120; r += 38) display_.drawCircle(cx, cy, r, kUiLine);
     display_.fillCircle(cx, cy, 26, kUiText);
-    display_.setTextDatum(MC_DATUM);
-    display_.setTextSize((w >= 1200) ? 5 : 3);
-    display_.setTextColor(kUiText, kUiBg, true);
-    display_.drawString(String(seconds, 1) + "s", cx, cy + 156);
-    display_.setTextDatum(TL_DATUM);
+    renderer_.drawText(String(seconds, 1) + "s", cx, cy + 156,
+                       (w >= 1200) ? 5 : 3, TextAlign::MiddleCenter,
+                       kUiText, kUiBg);
   } else {
     const int textY = topH + margin + titleSize * 10 + 24;
     const int lineH = (bodySize == 4) ? 46 : 34;
@@ -214,9 +207,8 @@ void MemoUI::drawStatus(const char* badge, const String& title, const String& bo
                 max(3, (h - textY - 100) / lineH));
   }
 
-  display_.setTextSize(smallSize);
-  display_.setTextColor(kUiMuted, kUiBg, true);
-  display_.drawString(hint, margin, h - margin - 24);
+  renderer_.drawText(hint, margin, h - margin - 24, smallSize,
+                     TextAlign::TopLeft, kUiMuted, kUiBg);
   display_.update();
 }
 
@@ -349,40 +341,33 @@ void MemoUI::drawCard(int x, int y, int w, int h,
     const int rightEdge = x + w - rightPad;
 
     // Date chip near the top of the card.
-    display_.setTextSize(3);
     const int chipPad = 18;
     const int chipH   = 38;
-    const int chipW   = display_.textWidth(dateChip) + chipPad * 2;
+    const int chipW   = renderer_.measureText(dateChip, 3) + chipPad * 2;
     const int chipX   = rightEdge - chipW;
     const int chipY   = y + 16;
     const uint16_t chipFill = overdue ? kUiCardDark
                                : (entry.done ? kUiMuted : kUiBadge);
     display_.fillRoundRect(chipX, chipY, chipW, chipH, 8, chipFill);
-    display_.setTextDatum(MC_DATUM);
-    display_.setTextColor(kUiTextInv, chipFill, true);
-    display_.drawString(dateChip, chipX + chipW / 2, chipY + chipH / 2 - 1);
+    renderer_.drawText(dateChip, chipX + chipW / 2, chipY + chipH / 2 - 1, 3,
+                       TextAlign::MiddleCenter, kUiTextInv, chipFill);
 
     // Big time anchored to the BOTTOM of the card, so it can never overlap
     // the chip regardless of card height.
     if (timeBig.length() > 0) {
-      display_.setTextSize(5);
-      display_.setTextColor(fg, fill, true);
-      display_.setTextDatum(BR_DATUM);
-      display_.drawString(timeBig, rightEdge, y + h - 16);
+      renderer_.drawText(timeBig, rightEdge, y + h - 16, 5,
+                         TextAlign::BottomRight, fg, fill);
     }
   }
 
   // ---- Memo text ----
   const int memoSize  = 4;
   const int memoLineH = 42;
-  const int oneLineW  = display_.textWidth(entry.text);
-
-  display_.setTextSize(memoSize);
-  display_.setTextColor(fg, fill, true);
-  display_.setTextDatum(TL_DATUM);
+  const int oneLineW  = renderer_.measureText(entry.text, memoSize);
 
   if (oneLineW <= memoMaxW) {
-    display_.drawString(entry.text, memoX, y + h / 2 - memoSize * 6);
+    renderer_.drawText(entry.text, memoX, y + h / 2 - memoSize * 6, memoSize,
+                       TextAlign::TopLeft, fg, fill);
   } else {
     drawWrapped(entry.text, memoX, y + 24, memoMaxW, memoLineH,
                 memoSize, fg, 2);
@@ -398,18 +383,14 @@ void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
   // Left column: clipboard logo (top) + "Notes" (bottom), enlarged.
   const int logoSize = 72;
   drawClipboardLogo(margin, topY, logoSize, kUiText);
-  display_.setTextDatum(TL_DATUM);
-  display_.setTextSize(4);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString(uiStr(UiStringId::kAppName), margin, topY + logoSize + 10);
+  renderer_.drawText(uiStr(UiStringId::kAppName), margin, topY + logoSize + 10, 4,
+                     TextAlign::TopLeft, kUiText, kUiBg);
 
   // Center column: big time (top) + date (bottom), centered and enlarged.
-  display_.setTextDatum(TC_DATUM);
-  display_.setTextSize(11);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString(rtc.nowTimeLabel(), w / 2, topY);
-  display_.setTextSize(4);
-  display_.drawString(rtc.nowHeaderDateLabel(), w / 2, topY + 11 * 8 + 18);
+  renderer_.drawText(rtc.nowTimeLabel(), w / 2, topY, 11,
+                     TextAlign::TopCenter, kUiText, kUiBg);
+  renderer_.drawText(rtc.nowHeaderDateLabel(), w / 2, topY + 11 * 8 + 18, 4,
+                     TextAlign::TopCenter, kUiText, kUiBg);
 
   // Right column.
   if (st.processing) {
@@ -417,21 +398,17 @@ void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
     const int cy = topY + 26;
     display_.drawCircle(cx, cy, 22, kUiText);
     display_.fillCircle(cx, cy - 22, 5, kUiText);
-    display_.setTextDatum(MR_DATUM);
-    display_.setTextSize(4);
-    display_.setTextColor(kUiText, kUiBg, true);
-    display_.drawString(uiStr(UiStringId::kProcessing), cx - 40, cy);
+    renderer_.drawText(uiStr(UiStringId::kProcessing), cx - 40, cy, 4,
+                       TextAlign::MiddleRight, kUiText, kUiBg);
   } else {
     const int battW = 60, battH = 30;
     const int battX = w - margin - battW - 4;
     const int battY = topY + 6;
     drawBatteryIcon(battX, battY, battW, battH, st.batteryPercent, kUiText);
-    display_.setTextDatum(MR_DATUM);
-    display_.setTextSize(3);
-    display_.setTextColor(kUiText, kUiBg, true);
     char pbuf[8];
     snprintf(pbuf, sizeof(pbuf), "%d%%", st.batteryPercent < 0 ? 0 : st.batteryPercent);
-    display_.drawString(pbuf, battX - 8, battY + battH / 2);
+    renderer_.drawText(pbuf, battX - 8, battY + battH / 2, 3,
+                       TextAlign::MiddleRight, kUiText, kUiBg);
 
     const int wifiW = 44, wifiH = 32;
     drawWifiIcon(w - margin - wifiW, battY + battH + 18, wifiW, wifiH,
@@ -443,10 +420,8 @@ void MemoUI::drawBoot(RtcClock& rtc, const String& statusText, const UiStatus& s
 {
   display_.fillSprite(kUiBg);
   drawHeader(rtc, st);
-  display_.setTextDatum(MC_DATUM);
-  display_.setTextSize(4);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString(statusText, display_.width() / 2, display_.height() / 2);
+  renderer_.drawText(statusText, display_.width() / 2, display_.height() / 2, 4,
+                     TextAlign::MiddleCenter, kUiText, kUiBg);
   display_.update();
 }
 
@@ -480,11 +455,9 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   const int cardW = w - margin * 2;
 
   if (store.count() == 0) {
-    display_.setTextDatum(MC_DATUM);
-    display_.setTextSize(4);
-    display_.setTextColor(kUiMuted, kUiBg, true);
-    display_.drawString(uiStr(UiStringId::kEmptyList),
-                        w / 2, listTop + listAvail / 2);
+    renderer_.drawText(uiStr(UiStringId::kEmptyList), w / 2,
+                       listTop + listAvail / 2, 4,
+                       TextAlign::MiddleCenter, kUiMuted, kUiBg);
   } else {
     for (size_t i = 0; i < store.count(); i++) {
       const int cardY = listTop + static_cast<int>(i) * rowH + gap / 2;
@@ -494,14 +467,11 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   }
 
   // ---- Footer ----
-  display_.setTextDatum(BL_DATUM);
-  display_.setTextSize(3);
-  display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString(hint, margin, h - 36);
-
-  display_.setTextDatum(BR_DATUM);
-  display_.drawString(String(store.count()) + "/" + String(MemoStore::kMax),
-                      w - margin, h - 36);
+  renderer_.drawText(hint, margin, h - 36, 3,
+                     TextAlign::BottomLeft, kUiText, kUiBg);
+  renderer_.drawText(String(store.count()) + "/" + String(MemoStore::kMax),
+                     w - margin, h - 36, 3,
+                     TextAlign::BottomRight, kUiText, kUiBg);
   display_.update();
 #else
   // Smaller panels stay on the wrapped text fallback. Touch toggling is
