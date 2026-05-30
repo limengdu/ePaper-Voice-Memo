@@ -1,0 +1,26 @@
+# PlatformIO build output
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Secrets -- never commit real keys
+src/secrets.h
+.env
+
+# Build artifacts
+*.bin
+*.elf
+*.hex
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude local settings
+.claude/settings.local.json
