@@ -46,6 +46,8 @@ class RtcClock {
   String nowDateLabel();
   // Returns a long-form date string for the header, e.g. "Friday, May 30".
   String nowLongDateLabel();
+  // Compact header date, e.g. "Apr 28 Tue".
+  String nowHeaderDateLabel();
 
  private:
   static constexpr uint8_t kAddress = 0x51;

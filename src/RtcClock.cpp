@@ -230,3 +230,22 @@ String RtcClock::nowLongDateLabel()
            kWeekdayFull[wd], kMonthShort[mo], rt.day);
   return String(buf);
 }
+
+String RtcClock::nowHeaderDateLabel()
+{
+  VoiceMemoRtcTime rt = {};
+  if (!available_ || !readTime(rt) || !rt.voltageOK) return "--/--";
+
+  static const char* kMonthShort[] = {
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+  };
+
+  const int wd = (rt.weekday >= 0 && rt.weekday < 7) ? rt.weekday : 0;
+  const int mo = (rt.month  >= 1 && rt.month  <= 12) ? rt.month - 1 : 0;
+
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%s %02d %s",
+           kMonthShort[mo], rt.day, kWeekdayNames[wd]);
+  return String(buf);
+}
