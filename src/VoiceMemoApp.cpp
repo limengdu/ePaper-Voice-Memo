@@ -2,6 +2,8 @@
 
 #include <WiFi.h>
 
+#include "BatteryMath.h"
+
 VoiceMemoApp::VoiceMemoApp(const VoiceMemoConfig& config)
   : config_(config),
     audio_(),
@@ -38,6 +40,29 @@ void VoiceMemoApp::setupPins()
   pinMode(kKey0Pin, INPUT);
   pinMode(kBuzzerPin, OUTPUT);
   digitalWrite(kBuzzerPin, LOW);
+
+  pinMode(kBatteryEnablePin, OUTPUT);
+  digitalWrite(kBatteryEnablePin, LOW);
+  analogReadResolution(12);
+  analogSetPinAttenuation(kBatteryAdcPin, ADC_11db);
+}
+
+int VoiceMemoApp::readBatteryPercent()
+{
+  digitalWrite(kBatteryEnablePin, HIGH);
+  delay(5);
+  const int mv = analogReadMilliVolts(kBatteryAdcPin);
+  digitalWrite(kBatteryEnablePin, LOW);
+  return vmBatteryPercent(mv);
+}
+
+UiStatus VoiceMemoApp::currentStatus(bool processing)
+{
+  UiStatus s;
+  s.wifiConnected  = (WiFi.status() == WL_CONNECTED);
+  s.batteryPercent = readBatteryPercent();
+  s.processing     = processing;
+  return s;
 }
 
 bool VoiceMemoApp::ensureWiFi(uint32_t timeoutMs)

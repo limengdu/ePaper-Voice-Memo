@@ -69,6 +69,10 @@ class VoiceMemoApp {
   static constexpr int kTouchResetPin  = 48;
   static constexpr int kBuzzerPin      = 45;
 
+  // Battery sense (E1003-specific enable pin; verify against schematic).
+  static constexpr int kBatteryEnablePin = 40;
+  static constexpr int kBatteryAdcPin    = 1;
+
   static constexpr unsigned long kDebounceDelayMs = 35;
 
   const VoiceMemoConfig config_;
@@ -95,6 +99,8 @@ class VoiceMemoApp {
   void ledOff();
   void beepStart();
   bool ensureWiFi(uint32_t timeoutMs);
+  int      readBatteryPercent();
+  UiStatus currentStatus(bool processing);
 
   void pollButton();
   void pollTouch();

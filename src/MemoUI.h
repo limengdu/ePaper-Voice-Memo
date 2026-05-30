@@ -24,6 +24,13 @@
 #include "RtcClock.h"
 #include "TFT_eSPI.h"
 
+// Snapshot of device status drawn in the header.
+struct UiStatus {
+  bool wifiConnected = false;
+  int  batteryPercent = -1;   // -1 = unknown
+  bool processing = false;    // true -> show "Processing" instead of icons
+};
+
 class MemoUI {
  public:
   MemoUI();
