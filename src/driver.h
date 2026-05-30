@@ -1,12 +1,15 @@
 #ifndef VOICE_MEMO_REMINDER_DRIVER_H
 #define VOICE_MEMO_REMINDER_DRIVER_H
 
-// Select exactly one target. E1004 is intentionally not listed because it has
-// no onboard microphone.
-//
-// #define VOICE_MEMO_DEVICE_E1001
-// #define VOICE_MEMO_DEVICE_E1002
-#define VOICE_MEMO_DEVICE_E1003
+// The device target is selected by platformio.ini via a build flag:
+//   -D VOICE_MEMO_DEVICE_E1001 / E1002 / E1003
+// E1004 is intentionally unsupported because it has no onboard microphone.
+// Fall back to E1003 when built without an explicit target (e.g. Arduino IDE).
+#if !defined(VOICE_MEMO_DEVICE_E1001) && \
+    !defined(VOICE_MEMO_DEVICE_E1002) && \
+    !defined(VOICE_MEMO_DEVICE_E1003)
+  #define VOICE_MEMO_DEVICE_E1003
+#endif
 
 #define VM_SCREEN_GRAY4   1
 #define VM_SCREEN_COLOR6  2
