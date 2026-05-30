@@ -1,0 +1,53 @@
+#include <unity.h>
+#include <string.h>
+#include "UiLang.h"
+
+// The string table is exposed as two columns (uiStrEn / uiStrZh) so this one
+// native build can assert both languages regardless of VM_LANG_ZH.
+
+void test_en_column_spot_values() {
+    TEST_ASSERT_EQUAL_STRING("Notes",      uiStrEn(UiStringId::kAppName));
+    TEST_ASSERT_EQUAL_STRING("Processing", uiStrEn(UiStringId::kProcessing));
+    TEST_ASSERT_EQUAL_STRING("Reminders",  uiStrEn(UiStringId::kReminders));
+    TEST_ASSERT_EQUAL_STRING("Overdue",    uiStrEn(UiStringId::kOverdue));
+}
+
+void test_zh_column_spot_values() {
+    TEST_ASSERT_EQUAL_STRING("笔记",   uiStrZh(UiStringId::kAppName));
+    TEST_ASSERT_EQUAL_STRING("处理中", uiStrZh(UiStringId::kProcessing));
+    TEST_ASSERT_EQUAL_STRING("提醒",   uiStrZh(UiStringId::kReminders));
+    TEST_ASSERT_EQUAL_STRING("已逾期", uiStrZh(UiStringId::kOverdue));
+}
+
+// Every id must resolve to a non-empty string in both columns, and the two
+// columns must differ (catches a copy-paste that left a cell in English).
+void test_every_id_nonempty_and_distinct() {
+    for (int i = 0; i < static_cast<int>(UiStringId::kCount); i++) {
+        const UiStringId id = static_cast<UiStringId>(i);
+        TEST_ASSERT_TRUE(uiStrEn(id)[0] != '\0');
+        TEST_ASSERT_TRUE(uiStrZh(id)[0] != '\0');
+        TEST_ASSERT_TRUE(strcmp(uiStrEn(id), uiStrZh(id)) != 0);
+    }
+}
+
+void test_wipe_when_tag_differs_or_missing() {
+    // Same language -> keep.
+    TEST_ASSERT_FALSE(vmShouldWipeForLanguage(0, 0));
+    TEST_ASSERT_FALSE(vmShouldWipeForLanguage(1, 1));
+    // Different language -> wipe.
+    TEST_ASSERT_TRUE(vmShouldWipeForLanguage(0, 1));
+    TEST_ASSERT_TRUE(vmShouldWipeForLanguage(1, 0));
+    // Missing tag (-1) -> wipe for either firmware language.
+    TEST_ASSERT_TRUE(vmShouldWipeForLanguage(-1, 0));
+    TEST_ASSERT_TRUE(vmShouldWipeForLanguage(-1, 1));
+}
+
+int main(int argc, char **argv)
+{
+    UNITY_BEGIN();
+    RUN_TEST(test_en_column_spot_values);
+    RUN_TEST(test_zh_column_spot_values);
+    RUN_TEST(test_every_id_nonempty_and_distinct);
+    RUN_TEST(test_wipe_when_tag_differs_or_missing);
+    return UNITY_END();
+}

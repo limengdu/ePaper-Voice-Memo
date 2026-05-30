@@ -38,26 +38,50 @@ void test_cross_midnight() {
     TEST_ASSERT_EQUAL_INT(1, vmDayDistance(now, due));
 }
 
+// ---- English chip labels ----
 void test_label_today() {
-    TEST_ASSERT_EQUAL_STRING("Today",     vmDateChipLabel(0, 5));
+    TEST_ASSERT_EQUAL_STRING("Today",     vmDateChipLabelEn(0, 5));
 }
 
 void test_label_tomorrow() {
-    TEST_ASSERT_EQUAL_STRING("Tomorrow",  vmDateChipLabel(1, 6));
+    TEST_ASSERT_EQUAL_STRING("Tomorrow",  vmDateChipLabelEn(1, 6));
 }
 
 void test_label_day_after() {
-    TEST_ASSERT_EQUAL_STRING("Day after", vmDateChipLabel(2, 0));
+    TEST_ASSERT_EQUAL_STRING("Day after", vmDateChipLabelEn(2, 0));
 }
 
 void test_label_weekday_full() {
-    TEST_ASSERT_EQUAL_STRING("Wednesday", vmDateChipLabel(3, 3));
-    TEST_ASSERT_EQUAL_STRING("Sunday",    vmDateChipLabel(5, 0));
+    TEST_ASSERT_EQUAL_STRING("Wednesday", vmDateChipLabelEn(3, 3));
+    TEST_ASSERT_EQUAL_STRING("Sunday",    vmDateChipLabelEn(5, 0));
 }
 
 void test_label_null_for_seven_plus() {
-    TEST_ASSERT_NULL(vmDateChipLabel(7,  1));
-    TEST_ASSERT_NULL(vmDateChipLabel(14, 2));
+    TEST_ASSERT_NULL(vmDateChipLabelEn(7,  1));
+    TEST_ASSERT_NULL(vmDateChipLabelEn(14, 2));
+}
+
+// ---- Chinese chip labels (same day/index contract) ----
+void test_label_today_zh() {
+    TEST_ASSERT_EQUAL_STRING("今天", vmDateChipLabelZh(0, 5));
+}
+
+void test_label_tomorrow_zh() {
+    TEST_ASSERT_EQUAL_STRING("明天", vmDateChipLabelZh(1, 6));
+}
+
+void test_label_day_after_zh() {
+    TEST_ASSERT_EQUAL_STRING("后天", vmDateChipLabelZh(2, 0));
+}
+
+void test_label_weekday_zh() {
+    TEST_ASSERT_EQUAL_STRING("周三", vmDateChipLabelZh(3, 3));
+    TEST_ASSERT_EQUAL_STRING("周日", vmDateChipLabelZh(5, 0));
+}
+
+void test_label_null_for_seven_plus_zh() {
+    TEST_ASSERT_NULL(vmDateChipLabelZh(7,  1));
+    TEST_ASSERT_NULL(vmDateChipLabelZh(14, 2));
 }
 
 int main(int argc, char **argv)
@@ -72,5 +96,10 @@ int main(int argc, char **argv)
     RUN_TEST(test_label_day_after);
     RUN_TEST(test_label_weekday_full);
     RUN_TEST(test_label_null_for_seven_plus);
+    RUN_TEST(test_label_today_zh);
+    RUN_TEST(test_label_tomorrow_zh);
+    RUN_TEST(test_label_day_after_zh);
+    RUN_TEST(test_label_weekday_zh);
+    RUN_TEST(test_label_null_for_seven_plus_zh);
     return UNITY_END();
 }

@@ -2,10 +2,13 @@
 
 #include <Preferences.h>
 
+#include "UiLang.h"
+
 namespace {
 
 constexpr const char* kNvsNamespace = "vmm";
 constexpr const char* kNvsKey       = "items";
+constexpr const char* kNvsLangKey   = "lang";
 
 // Time used to sort entries with no due time. They sink to the very end of
 // the upcoming section by pretending their due is far in the future.
@@ -52,7 +55,26 @@ MemoStore::MemoStore()
 
 bool MemoStore::begin()
 {
+  reconcileLanguage();
   return load();
+}
+
+void MemoStore::reconcileLanguage()
+{
+  // Reminders are stored in one language. When the firmware language differs
+  // from the tag saved beside the blob (or no tag exists yet), drop the blob
+  // so the device starts clean in the current language. Opening read-write
+  // creates the namespace on first boot, so the tag is always written once.
+  Preferences prefs;
+  if (!prefs.begin(kNvsNamespace, /*readOnly=*/false)) return;
+
+  const uint8_t raw = prefs.getUChar(kNvsLangKey, 0xFF);
+  const int storedTag = (raw == 0xFF) ? -1 : static_cast<int>(raw);
+  if (vmShouldWipeForLanguage(storedTag, VM_LANG_ZH)) {
+    prefs.remove(kNvsKey);
+    prefs.putUChar(kNvsLangKey, static_cast<uint8_t>(VM_LANG_ZH));
+  }
+  prefs.end();
 }
 
 bool MemoStore::load()

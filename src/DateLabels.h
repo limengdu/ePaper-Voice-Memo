@@ -1,6 +1,8 @@
 #pragma once
 #include <time.h>
 
+#include "UiLang.h"   // VM_LANG_ZH
+
 // Days from the calendar-day of `from` to the calendar-day of `to`
 // (both floored to local midnight). Positive = to is in the future.
 inline int vmDayDistance(time_t from, time_t to)
@@ -15,11 +17,11 @@ inline int vmDayDistance(time_t from, time_t to)
     return static_cast<int>((db - da) / 86400);
 }
 
-// Short date-chip label for a future event.
+// Short date-chip label (English) for a future event.
 // `days` = vmDayDistance(now, due)
 // `wday` = tm_wday of the due datetime (0=Sun...6=Sat)
 // Returns a string literal; returns nullptr for days >= 7 (caller formats "Mon DD").
-inline const char* vmDateChipLabel(int days, int wday)
+inline const char* vmDateChipLabelEn(int days, int wday)
 {
     static const char* kWeekdays[] = {
         "Sunday", "Monday", "Tuesday", "Wednesday",
@@ -32,3 +34,25 @@ inline const char* vmDateChipLabel(int days, int wday)
         return kWeekdays[(wday >= 0 && wday < 7) ? wday : 0];
     return nullptr;
 }
+
+// Short date-chip label (Chinese). Same contract as vmDateChipLabelEn:
+// returns nullptr for days >= 7 (caller formats a numeric month/day).
+inline const char* vmDateChipLabelZh(int days, int wday)
+{
+    static const char* kWeekdaysZh[] = {
+        "周日", "周一", "周二", "周三", "周四", "周五", "周六"
+    };
+    if (days == 0) return "今天";
+    if (days == 1) return "明天";
+    if (days == 2) return "后天";
+    if (days >= 3 && days <= 6)
+        return kWeekdaysZh[(wday >= 0 && wday < 7) ? wday : 0];
+    return nullptr;
+}
+
+// The build's active variant.
+#if VM_LANG_ZH
+  #define vmDateChipLabel vmDateChipLabelZh
+#else
+  #define vmDateChipLabel vmDateChipLabelEn
+#endif

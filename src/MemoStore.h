@@ -80,6 +80,10 @@ class MemoStore {
   MemoEntry items_[kMax];
   size_t    count_;
 
+  // Compares the NVS language tag against the firmware language and drops the
+  // reminder blob when they differ. Called at the start of begin().
+  void reconcileLanguage();
+
   bool load();
   bool save();
 };
