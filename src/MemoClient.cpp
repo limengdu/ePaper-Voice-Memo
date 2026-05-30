@@ -5,6 +5,7 @@
 #include <ctype.h>
 
 #include "JsonUtil.h"
+#include "UiLang.h"
 
 namespace {
 
@@ -159,6 +160,45 @@ MemoEntry MemoClient::summarizeOpenAICompatible(const String& transcript,
   //
   String system;
   system.reserve(2400);
+#if VM_LANG_ZH
+  // Chinese build: ask for a Chinese memo and Chinese time-of-day labels.
+  // Same pre-escaped style as the English branch (\\n is a JSON newline,
+  // \\\" a JSON quote) so it can be appended to the body unchanged.
+  system += "你是一个嵌入式提醒设备的备忘提取引擎。";
+  system += "用户的语音转写可能是中文、英文或中英混合。\\n\\n";
+  system += "当前本地时间: ";
+  system += nowStr;
+  system += " (";
+  system += weekday;
+  system += ").\\n\\n";
+  system += "只返回下面这个 JSON 对象, 不要任何解释, 不要 markdown 代码块。\\n";
+  system += "{\\\"memo\\\":\\\"<简短中文提醒>\\\",\\\"due\\\":\\\"YYYY-MM-DD HH:MM\\\",\\\"due_label\\\":\\\"<时段词或留空>\\\"}\\n\\n";
+  system += "字段规则:\\n";
+  system += "1) memo: 一句简洁的中文提醒, 去掉口头语, 不要以\\\"记得\\\"开头。\\n";
+  system += "2) due: 始终给出一个绝对的本地日期时间, 基于当前本地时间做最合理推断。\\n";
+  system += "3) due_label: 只用来区分一天中的时段。\\n";
+  system += "   - 已给出具体钟点(如 8、14:30、3点) -> due_label = \\\"\\\" (设备显示 HH:MM)。\\n";
+  system += "   - 只说了某个时段、没有数字 -> 用一个词: 早上 / 下午 / 中午 / 晚上。\\n";
+  system += "       早上/上午/morning -> 早上\\n";
+  system += "       下午/afternoon -> 下午\\n";
+  system += "       中午/noon -> 中午\\n";
+  system += "       晚上/夜里/今晚/tonight/evening -> 晚上\\n";
+  system += "   - 完全没有提到时间 -> due_label = \\\"NONE\\\" (设备不显示钟点)。\\n";
+  system += "   日期由设备根据 due 计算。绝不要把日期词(今天/明天/本周)放进 due_label。\\n\\n";
+  system += "示例:\\n";
+  system += "输入: \\\"明天去跳舞\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"去跳舞\\\",\\\"due\\\":\\\"2026-05-31 09:00\\\",\\\"due_label\\\":\\\"NONE\\\"}\\n";
+  system += "输入: \\\"提醒我今天晚上去洗澡\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"洗澡\\\",\\\"due\\\":\\\"2026-05-30 21:00\\\",\\\"due_label\\\":\\\"晚上\\\"}\\n";
+  system += "输入: \\\"晚上8点叫我吃饭\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"吃饭\\\",\\\"due\\\":\\\"2026-05-30 20:00\\\",\\\"due_label\\\":\\\"\\\"}\\n";
+  system += "输入: \\\"明天上午开会\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"开会\\\",\\\"due\\\":\\\"2026-05-31 09:00\\\",\\\"due_label\\\":\\\"早上\\\"}\\n";
+  system += "输入: \\\"下午3点取快递\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"取快递\\\",\\\"due\\\":\\\"2026-05-30 15:00\\\",\\\"due_label\\\":\\\"\\\"}\\n";
+  system += "输入: \\\"买点苹果\\\"\\n";
+  system += "输出: {\\\"memo\\\":\\\"买苹果\\\",\\\"due\\\":\\\"2026-05-30 19:00\\\",\\\"due_label\\\":\\\"NONE\\\"}";
+#else
   system += "You are a memo extraction engine for an embedded reminder ";
   system += "device. The user transcript may be Chinese, English, or mixed.\\n\\n";
   system += "CURRENT LOCAL TIME: ";
@@ -194,6 +234,7 @@ MemoEntry MemoClient::summarizeOpenAICompatible(const String& transcript,
   system += "Output: {\\\"memo\\\":\\\"Pick up package\\\",\\\"due\\\":\\\"2026-05-30 15:00\\\",\\\"due_label\\\":\\\"\\\"}\\n";
   system += "Input: \\\"\\u4e70\\u70b9\\u82f9\\u679c\\\"\\n";
   system += "Output: {\\\"memo\\\":\\\"Buy apples\\\",\\\"due\\\":\\\"2026-05-30 19:00\\\",\\\"due_label\\\":\\\"NONE\\\"}";
+#endif
 
   String body;
   body.reserve(transcript.length() + system.length() + 512);

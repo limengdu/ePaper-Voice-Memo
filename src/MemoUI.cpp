@@ -1,5 +1,6 @@
 #include "MemoUI.h"
 #include "DateLabels.h"
+#include "UiLang.h"
 
 #include <ctype.h>
 
@@ -71,13 +72,13 @@ String MemoUI::formatDueLabel(time_t nowEpoch, const MemoEntry& entry,
 {
   outOverdue = false;
   if (!entry.hasDue || entry.dueEpoch <= 0 || nowEpoch <= 0) {
-    outDateChip = "Some day";
+    outDateChip = uiStr(UiStringId::kSomeDay);
     outTimeBig  = "--:--";
     return outDateChip + " " + outTimeBig;
   }
   if (entry.dueEpoch < nowEpoch) {
     outOverdue = true;
-    outDateChip = "Overdue";
+    outDateChip = uiStr(UiStringId::kOverdue);
     struct tm t = {};
     localtime_r(&entry.dueEpoch, &t);
     char buf[8];
@@ -98,10 +99,14 @@ String MemoUI::formatDueLabel(time_t nowEpoch, const MemoEntry& entry,
   if (chipLabel) {
     outDateChip = chipLabel;
   } else {
-    char d[12];
+    char d[16];
+#if VM_LANG_ZH
+    snprintf(d, sizeof(d), "%d月%d日", t.tm_mon + 1, t.tm_mday);
+#else
     snprintf(d, sizeof(d), "%s %02d",
              kMonthShort[(t.tm_mon >= 0 && t.tm_mon < 12) ? t.tm_mon : 0],
              t.tm_mday);
+#endif
     outDateChip = d;
   }
   return outDateChip + " " + outTimeBig;
@@ -396,7 +401,7 @@ void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
   display_.setTextDatum(TL_DATUM);
   display_.setTextSize(4);
   display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString("Notes", margin, topY + logoSize + 10);
+  display_.drawString(uiStr(UiStringId::kAppName), margin, topY + logoSize + 10);
 
   // Center column: big time (top) + date (bottom), centered and enlarged.
   display_.setTextDatum(TC_DATUM);
@@ -415,7 +420,7 @@ void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
     display_.setTextDatum(MR_DATUM);
     display_.setTextSize(4);
     display_.setTextColor(kUiText, kUiBg, true);
-    display_.drawString("Processing", cx - 40, cy);
+    display_.drawString(uiStr(UiStringId::kProcessing), cx - 40, cy);
   } else {
     const int battW = 60, battH = 30;
     const int battX = w - margin - battW - 4;
@@ -478,7 +483,7 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
     display_.setTextDatum(MC_DATUM);
     display_.setTextSize(4);
     display_.setTextColor(kUiMuted, kUiBg, true);
-    display_.drawString("Hold KEY0 and speak to add your first reminder.",
+    display_.drawString(uiStr(UiStringId::kEmptyList),
                         w / 2, listTop + listAvail / 2);
   } else {
     for (size_t i = 0; i < store.count(); i++) {
@@ -503,7 +508,7 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   // disabled there because there is no touch hardware on E1001 / E1002.
   String body;
   if (store.count() == 0) {
-    body = "No reminders yet. Hold KEY0 to add the first one.";
+    body = uiStr(UiStringId::kEmptyList);
   } else {
     for (size_t i = 0; i < store.count(); i++) {
       String chip, big;
@@ -526,8 +531,9 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
       if (i + 1 < store.count()) body += "\n";
     }
   }
-  const char* badge = status.processing ? "Processing" : "Reminders";
-  drawStatus(badge, "Reminders", body, hint, false, 0.0f);
+  const char* badge = status.processing ? uiStr(UiStringId::kProcessing)
+                                         : uiStr(UiStringId::kReminders);
+  drawStatus(badge, uiStr(UiStringId::kReminders), body, hint, false, 0.0f);
 #endif
 }
 

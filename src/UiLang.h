@@ -33,6 +33,7 @@ enum class UiStringId {
   kBootWifi,       // boot splash: connecting WiFi
   kSomeDay,        // due label when the entry has no due time
   kOverdue,        // due label when the entry is past due
+  kNoSpeech,       // placeholder memo when speech was not recognized
   kCount
 };
 
@@ -51,6 +52,7 @@ inline const char* uiStrEn(UiStringId id) {
     case UiStringId::kBootWifi:     return "Connecting WiFi...";
     case UiStringId::kSomeDay:      return "Some day";
     case UiStringId::kOverdue:      return "Overdue";
+    case UiStringId::kNoSpeech:     return "No speech recognized.";
     default:                        return "";
   }
 }
@@ -70,6 +72,7 @@ inline const char* uiStrZh(UiStringId id) {
     case UiStringId::kBootWifi:     return "连接 WiFi…";
     case UiStringId::kSomeDay:      return "某天";
     case UiStringId::kOverdue:      return "已逾期";
+    case UiStringId::kNoSpeech:     return "未识别到语音。";
     default:                        return "";
   }
 }

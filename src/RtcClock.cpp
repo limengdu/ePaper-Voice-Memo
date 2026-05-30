@@ -2,11 +2,19 @@
 
 #include <Wire.h>
 
+#include "UiLang.h"
+
 namespace {
 
+#if VM_LANG_ZH
+const char* kWeekdayNames[] = {
+  "周日", "周一", "周二", "周三", "周四", "周五", "周六"
+};
+#else
 const char* kWeekdayNames[] = {
   "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
 };
+#endif
 
 uint8_t bcdToDec(uint8_t bcd)
 {
@@ -213,6 +221,16 @@ String RtcClock::nowLongDateLabel()
   VoiceMemoRtcTime rt = {};
   if (!available_ || !readTime(rt) || !rt.voltageOK) return "---";
 
+  const int wd = (rt.weekday >= 0 && rt.weekday < 7) ? rt.weekday : 0;
+  char buf[40];
+#if VM_LANG_ZH
+  static const char* kWeekdayFullZh[] = {
+    "星期日", "星期一", "星期二", "星期三",
+    "星期四", "星期五", "星期六"
+  };
+  snprintf(buf, sizeof(buf), "%d月%d日 %s",
+           rt.month, rt.day, kWeekdayFullZh[wd]);
+#else
   static const char* kWeekdayFull[] = {
     "Sunday", "Monday", "Tuesday", "Wednesday",
     "Thursday", "Friday", "Saturday"
@@ -221,13 +239,10 @@ String RtcClock::nowLongDateLabel()
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   };
-
-  const int wd = (rt.weekday >= 0 && rt.weekday < 7) ? rt.weekday : 0;
   const int mo = (rt.month  >= 1 && rt.month  <= 12) ? rt.month - 1 : 0;
-
-  char buf[32];
   snprintf(buf, sizeof(buf), "%s, %s %d",
            kWeekdayFull[wd], kMonthShort[mo], rt.day);
+#endif
   return String(buf);
 }
 
@@ -236,16 +251,19 @@ String RtcClock::nowHeaderDateLabel()
   VoiceMemoRtcTime rt = {};
   if (!available_ || !readTime(rt) || !rt.voltageOK) return "--/--";
 
+  const int wd = (rt.weekday >= 0 && rt.weekday < 7) ? rt.weekday : 0;
+  char buf[24];
+#if VM_LANG_ZH
+  snprintf(buf, sizeof(buf), "%d月%d日 %s",
+           rt.month, rt.day, kWeekdayNames[wd]);
+#else
   static const char* kMonthShort[] = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   };
-
-  const int wd = (rt.weekday >= 0 && rt.weekday < 7) ? rt.weekday : 0;
   const int mo = (rt.month  >= 1 && rt.month  <= 12) ? rt.month - 1 : 0;
-
-  char buf[24];
   snprintf(buf, sizeof(buf), "%s %02d %s",
            kMonthShort[mo], rt.day, kWeekdayNames[wd]);
+#endif
   return String(buf);
 }

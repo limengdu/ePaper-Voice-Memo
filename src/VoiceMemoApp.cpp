@@ -3,6 +3,7 @@
 #include <WiFi.h>
 
 #include "BatteryMath.h"
+#include "UiLang.h"
 
 VoiceMemoApp::VoiceMemoApp(const VoiceMemoConfig& config)
   : config_(config),
@@ -113,10 +114,12 @@ void VoiceMemoApp::begin()
   Serial1.println("=========================================");
 
   ui_.begin();
-  ui_.drawBoot(rtc_, "Starting...", currentStatus(false));
+  ui_.drawBoot(rtc_, uiStr(UiStringId::kBootStarting), currentStatus(false));
 
   if (!audio_.begin(config_.audio.sampleRate, config_.audio.maxRecordSeconds,
                     kMicClkPin, kMicDataPin, kMicPwrEnPin)) {
+    // TODO(i18n): hardware-fault diagnostics stay in English (contain code
+    // identifiers like PSRAM / driver.h and surface only on a boot failure).
     ui_.drawStatus("ERR", "Mic failed",
                    "Audio buffer or PDM microphone init failed. Check OPI PSRAM and driver.h.",
                    "Board: XIAO ESP32S3, PSRAM: OPI PSRAM.", false, 0.0f);
@@ -130,11 +133,11 @@ void VoiceMemoApp::begin()
   stt_.configure(config_.speech, config_.httpTimeoutMs);
   memo_.configure(config_.memo,  config_.httpTimeoutMs);
 
-  ui_.drawBoot(rtc_, "Connecting WiFi...", currentStatus(false));
+  ui_.drawBoot(rtc_, uiStr(UiStringId::kBootWifi), currentStatus(false));
   ensureWiFi(15000);
 
   ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                   "Hold KEY0 to add. Tap a box to check off.");
+                   uiStr(UiStringId::kHintAdd));
 }
 
 void VoiceMemoApp::startRecording()
@@ -168,7 +171,7 @@ void VoiceMemoApp::stopRecording(bool forced)
 
   if (audio_.tooShort()) {
     ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                     "Hold KEY0 for at least one second.");
+                     uiStr(UiStringId::kHintTooShort));
     busy_ = false;
     return;
   }
@@ -181,13 +184,13 @@ void VoiceMemoApp::stopRecording(bool forced)
   // Inline processing state: keep the list visible, show "Processing" in the
   // header. Safe to refresh here -- audio capture is already complete.
   ui_.drawTodoList(store_, rtc_, currentStatus(true),
-                   "Hold KEY0 to add. Tap a box to check off.");
+                   uiStr(UiStringId::kHintAdd));
   ledOn();   // solid LED through the network call as a second cue
 
   if (!ensureWiFi(10000)) {
     ledOff();
     ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                     "Reminder skipped because WiFi is unavailable.");
+                     uiStr(UiStringId::kHintNoWifi));
     busy_ = false;
     return;
   }
@@ -196,7 +199,7 @@ void VoiceMemoApp::stopRecording(bool forced)
   const bool sttOk = stt_.transcribe(audio_.wavData(), audio_.wavSize(),
                                      transcript);
   if (!sttOk && transcript.length() == 0) {
-    transcript = "No speech recognized.";
+    transcript = uiStr(UiStringId::kNoSpeech);
   }
   Serial1.printf("[stt] \"%s\"\n", transcript.c_str());
 
@@ -210,8 +213,8 @@ void VoiceMemoApp::stopRecording(bool forced)
   ledOff();
 
   const String hint = forced
-      ? "Stopped at max length. Hold KEY0 for another memo."
-      : "Hold KEY0 to add. Tap a box to check off.";
+      ? uiStr(UiStringId::kHintMaxLen)
+      : uiStr(UiStringId::kHintAdd);
   ui_.drawTodoList(store_, rtc_, currentStatus(false), hint);
 
   busy_ = false;
@@ -268,7 +271,7 @@ void VoiceMemoApp::pollTouch()
   Serial1.printf("[touch] toggle row %d\n", idx);
   store_.toggleDone(static_cast<size_t>(idx));
   ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                   "Hold KEY0 to add. Tap a box to check off.");
+                   uiStr(UiStringId::kHintAdd));
 }
 
 void VoiceMemoApp::loop()
