@@ -387,49 +387,49 @@ void MemoUI::drawCard(int x, int y, int w, int h,
 void MemoUI::drawHeader(RtcClock& rtc, const UiStatus& st)
 {
   const int w = display_.width();
-  const int margin = 80;
-  const int topY = 24;
+  const int margin = 70;
+  const int topY = 30;
 
-  // Left column: clipboard logo (top) + "Notes" (bottom).
-  const int logoSize = 56;
+  // Left column: clipboard logo (top) + "Notes" (bottom), enlarged.
+  const int logoSize = 72;
   drawClipboardLogo(margin, topY, logoSize, kUiText);
   display_.setTextDatum(TL_DATUM);
-  display_.setTextSize(3);
+  display_.setTextSize(4);
   display_.setTextColor(kUiText, kUiBg, true);
-  display_.drawString("Notes", margin, topY + logoSize + 8);
+  display_.drawString("Notes", margin, topY + logoSize + 10);
 
-  // Center column: big time (top) + date (bottom), centered.
+  // Center column: big time (top) + date (bottom), centered and enlarged.
   display_.setTextDatum(TC_DATUM);
-  display_.setTextSize(8);
+  display_.setTextSize(11);
   display_.setTextColor(kUiText, kUiBg, true);
   display_.drawString(rtc.nowTimeLabel(), w / 2, topY);
-  display_.setTextSize(3);
-  display_.drawString(rtc.nowHeaderDateLabel(), w / 2, topY + 8 * 8 + 14);
+  display_.setTextSize(4);
+  display_.drawString(rtc.nowHeaderDateLabel(), w / 2, topY + 11 * 8 + 18);
 
   // Right column.
   if (st.processing) {
-    const int cx = w - margin - 18;
-    const int cy = topY + 20;
-    display_.drawCircle(cx, cy, 16, kUiText);
-    display_.fillCircle(cx, cy - 16, 4, kUiText);
+    const int cx = w - margin - 24;
+    const int cy = topY + 26;
+    display_.drawCircle(cx, cy, 22, kUiText);
+    display_.fillCircle(cx, cy - 22, 5, kUiText);
+    display_.setTextDatum(MR_DATUM);
+    display_.setTextSize(4);
+    display_.setTextColor(kUiText, kUiBg, true);
+    display_.drawString("Processing", cx - 40, cy);
+  } else {
+    const int battW = 60, battH = 30;
+    const int battX = w - margin - battW - 4;
+    const int battY = topY + 6;
+    drawBatteryIcon(battX, battY, battW, battH, st.batteryPercent, kUiText);
     display_.setTextDatum(MR_DATUM);
     display_.setTextSize(3);
     display_.setTextColor(kUiText, kUiBg, true);
-    display_.drawString("Processing", cx - 30, cy);
-  } else {
-    const int battW = 46, battH = 22;
-    const int battX = w - margin - battW - 3;
-    const int battY = topY + 2;
-    drawBatteryIcon(battX, battY, battW, battH, st.batteryPercent, kUiText);
-    display_.setTextDatum(MR_DATUM);
-    display_.setTextSize(2);
-    display_.setTextColor(kUiText, kUiBg, true);
     char pbuf[8];
     snprintf(pbuf, sizeof(pbuf), "%d%%", st.batteryPercent < 0 ? 0 : st.batteryPercent);
-    display_.drawString(pbuf, battX - 6, battY + battH / 2);
+    display_.drawString(pbuf, battX - 8, battY + battH / 2);
 
-    const int wifiW = 34, wifiH = 24;
-    drawWifiIcon(w - margin - wifiW, battY + battH + 14, wifiW, wifiH,
+    const int wifiW = 44, wifiH = 32;
+    drawWifiIcon(w - margin - wifiW, battY + battH + 18, wifiW, wifiH,
                  st.wifiConnected, kUiText);
   }
 }
@@ -462,7 +462,7 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   display_.fillSprite(kUiBg);
   drawHeader(rtc, status);
 
-  const int headerH = 200;   // header band height (no divider line)
+  const int headerH = 180;   // header band height (no divider line)
 
   // ---- Card list ----
   const int footerH = 100;
