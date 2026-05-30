@@ -49,13 +49,6 @@ class MemoUI {
                   bool recording,
                   float seconds);
 
-  // Dedicated "processing" screen shown after recording stops and before
-  // the AI pipeline completes. Draws a static spinner graphic so the user
-  // knows the device is working on their memo.
-  void drawProcessing(const String& title,
-                      const String& body,
-                      const String& hint);
-
   // Main reminder list. nowEpoch is used to label entries as Today /
   // Tomorrow / Overdue and to sort the cards in MemoStore before rendering.
   // Side effect: also populates the internal checkbox hit-test cache so

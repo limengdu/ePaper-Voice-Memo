@@ -178,9 +178,10 @@ void VoiceMemoApp::stopRecording(bool forced)
   // Screen refresh is safe here because audio capture is already complete.
   // Unlike at recording START, where an ePaper refresh would starve the I2S
   // DMA ring and lose audio samples.
-  ui_.drawProcessing("Processing your voice",
-                     "Transcribing and summarizing your memo.\nThis usually takes 5-10 seconds.",
-                     "Hold tight, screen will update automatically.");
+  // Inline processing state: keep the list visible, show "Processing" in the
+  // header. Safe to refresh here -- audio capture is already complete.
+  ui_.drawTodoList(store_, rtc_, currentStatus(true),
+                   "Hold KEY0 to add. Tap a box to check off.");
   ledOn();   // solid LED through the network call as a second cue
 
   if (!ensureWiFi(10000)) {
