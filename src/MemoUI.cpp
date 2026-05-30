@@ -319,6 +319,54 @@ void MemoUI::drawNotebookLogo(int x, int y, int size, uint16_t color)
   display_.drawFastHLine(lineX1, bodyY + bodyH * 3 / 4, (lineX2 - lineX1) * 2 / 3, color);
 }
 
+void MemoUI::drawClipboardLogo(int x, int y, int size, uint16_t color)
+{
+  // Clip tab at top center.
+  const int clipW = size / 3;
+  const int clipH = size / 8;
+  display_.fillRoundRect(x + size / 2 - clipW / 2, y, clipW, clipH, 3, color);
+
+  // Board body (double outline so it reads on ePaper).
+  const int boardY = y + clipH / 2;
+  const int boardH = size - clipH / 2;
+  display_.drawRoundRect(x,     boardY,     size,     boardH,     6, color);
+  display_.drawRoundRect(x + 1, boardY + 1, size - 2, boardH - 2, 6, color);
+
+  // Ruled lines.
+  const int lx1 = x + size / 5;
+  const int lx2 = x + size * 4 / 5;
+  for (int i = 1; i <= 3; i++) {
+    const int ly = boardY + boardH * i / 4;
+    const int len = (i == 3) ? (lx2 - lx1) * 2 / 3 : (lx2 - lx1);
+    display_.drawFastHLine(lx1, ly, len, color);
+  }
+}
+
+void MemoUI::drawBatteryIcon(int x, int y, int w, int h, int percent, uint16_t color)
+{
+  display_.drawRect(x, y, w, h, color);
+  const int nubW = 3, nubH = h / 3;
+  display_.fillRect(x + w, y + (h - nubH) / 2, nubW, nubH, color);
+  if (percent < 0) return;                       // unknown -> empty body
+  const int fillW = (w - 4) * percent / 100;
+  if (fillW > 0) display_.fillRect(x + 2, y + 2, fillW, h - 4, color);
+}
+
+void MemoUI::drawWifiIcon(int x, int y, int w, int h, bool connected, uint16_t color)
+{
+  // Signal-bar style (ascending). Solid = connected, outline + slash = not.
+  const int bars = 4, gap = 3;
+  const int bw = (w - gap * (bars - 1)) / bars;
+  for (int i = 0; i < bars; i++) {
+    const int bh = h * (i + 1) / bars;
+    const int bx = x + i * (bw + gap);
+    const int by = y + h - bh;
+    if (connected) display_.fillRect(bx, by, bw, bh, color);
+    else           display_.drawRect(bx, by, bw, bh, color);
+  }
+  if (!connected) display_.drawLine(x, y, x + w, y + h, color);
+}
+
 void MemoUI::drawCheckbox(int cx, int cy, int size, bool done, uint16_t fg)
 {
   const int x = cx - size / 2;

@@ -97,6 +97,9 @@ class MemoUI {
                    int textSize, uint16_t color, int maxLines);
 
   void drawNotebookLogo(int x, int y, int size, uint16_t color);
+  void drawClipboardLogo(int x, int y, int size, uint16_t color);
+  void drawBatteryIcon(int x, int y, int w, int h, int percent, uint16_t color);
+  void drawWifiIcon(int x, int y, int w, int h, bool connected, uint16_t color);
 };
 
 #endif  // VOICE_MEMO_MEMO_UI_H
