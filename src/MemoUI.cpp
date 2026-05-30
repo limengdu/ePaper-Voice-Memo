@@ -1,0 +1,571 @@
+#include "MemoUI.h"
+#include "DateLabels.h"
+
+#include <ctype.h>
+
+namespace {
+
+// UI colors picked per panel capability so the same drawing code reuses each
+// panel's actual headroom: E1001 gray4, E1002 six-color, E1003 gray16.
+#if VM_SCREEN_MODE == VM_SCREEN_GRAY4
+constexpr uint16_t kUiBg       = TFT_GRAY_3;   // page background
+constexpr uint16_t kUiCard     = TFT_GRAY_2;   // card fill
+constexpr uint16_t kUiCardDark = TFT_GRAY_1;   // overdue card fill
+constexpr uint16_t kUiCardDone = TFT_GRAY_3;   // done card fill (= page bg, very subtle)
+constexpr uint16_t kUiText     = TFT_GRAY_0;
+constexpr uint16_t kUiTextInv  = TFT_GRAY_3;
+constexpr uint16_t kUiMuted    = TFT_GRAY_1;
+constexpr uint16_t kUiLine     = TFT_GRAY_1;
+constexpr uint16_t kUiBadge    = TFT_GRAY_2;
+#elif VM_SCREEN_MODE == VM_SCREEN_COLOR6
+constexpr uint16_t kUiBg       = TFT_WHITE;
+constexpr uint16_t kUiCard     = TFT_YELLOW;
+constexpr uint16_t kUiCardDark = TFT_RED;
+constexpr uint16_t kUiCardDone = TFT_WHITE;
+constexpr uint16_t kUiText     = TFT_BLACK;
+constexpr uint16_t kUiTextInv  = TFT_WHITE;
+constexpr uint16_t kUiMuted    = TFT_BLUE;
+constexpr uint16_t kUiLine     = TFT_BLACK;
+constexpr uint16_t kUiBadge    = TFT_BLUE;
+#elif VM_SCREEN_MODE == VM_SCREEN_GRAY16
+constexpr uint16_t kUiBg       = TFT_GRAY_15;
+constexpr uint16_t kUiCard     = TFT_GRAY_13;
+constexpr uint16_t kUiCardDark = TFT_GRAY_4;
+constexpr uint16_t kUiCardDone = TFT_GRAY_14;  // done card almost blends in
+constexpr uint16_t kUiText     = TFT_GRAY_0;
+constexpr uint16_t kUiTextInv  = TFT_GRAY_14;
+constexpr uint16_t kUiMuted    = TFT_GRAY_7;
+constexpr uint16_t kUiLine     = TFT_GRAY_8;
+constexpr uint16_t kUiBadge    = TFT_GRAY_3;
+#endif
+
+const char* kWeekdayShort[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+const char* kMonthShort[]   = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+}  // namespace
+
+MemoUI::MemoUI()
+  : display_(),
+    checkboxHits_{}
+{
+  for (size_t i = 0; i < MemoStore::kMax; i++) checkboxHits_[i].valid = false;
+}
+
+void MemoUI::begin()
+{
+  display_.begin();
+#if VM_SCREEN_MODE == VM_SCREEN_GRAY4
+  display_.initGrayMode(GRAY_LEVEL4);
+#elif VM_SCREEN_MODE == VM_SCREEN_GRAY16
+  display_.initGrayMode(GRAY_LEVEL16);
+#endif
+}
+
+uint16_t MemoUI::displayWidth()  { return static_cast<uint16_t>(display_.width()); }
+uint16_t MemoUI::displayHeight() { return static_cast<uint16_t>(display_.height()); }
+
+String MemoUI::formatDueLabel(time_t nowEpoch, const MemoEntry& entry,
+                              String& outDateChip, String& outTimeBig,
+                              bool& outOverdue)
+{
+  outOverdue = false;
+  if (!entry.hasDue || entry.dueEpoch <= 0 || nowEpoch <= 0) {
+    outDateChip = "Some day";
+    outTimeBig  = "--:--";
+    return outDateChip + " " + outTimeBig;
+  }
+  if (entry.dueEpoch < nowEpoch) {
+    outOverdue = true;
+    outDateChip = "Overdue";
+    struct tm t = {};
+    localtime_r(&entry.dueEpoch, &t);
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%02d:%02d", t.tm_hour, t.tm_min);
+    outTimeBig = buf;
+    return outDateChip + " " + outTimeBig;
+  }
+
+  struct tm t = {};
+  localtime_r(&entry.dueEpoch, &t);
+
+  char timeBuf[8];
+  snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", t.tm_hour, t.tm_min);
+  outTimeBig = timeBuf;
+
+  const int days = vmDayDistance(nowEpoch, entry.dueEpoch);
+  const char* chipLabel = vmDateChipLabel(days, t.tm_wday);
+  if (chipLabel) {
+    outDateChip = chipLabel;
+  } else {
+    char d[12];
+    snprintf(d, sizeof(d), "%s %02d",
+             kMonthShort[(t.tm_mon >= 0 && t.tm_mon < 12) ? t.tm_mon : 0],
+             t.tm_mday);
+    outDateChip = d;
+  }
+  return outDateChip + " " + outTimeBig;
+}
+
+void MemoUI::drawWrapped(const String& text, int x, int y, int maxW,
+                         int lineH, int textSize, uint16_t color, int maxLines)
+{
+  display_.setTextSize(textSize);
+  display_.setTextColor(color, kUiBg, true);
+  display_.setTextDatum(TL_DATUM);
+
+  auto utf8Len = [&](size_t i) -> size_t {
+    const uint8_t c = static_cast<uint8_t>(text[i]);
+    if ((c & 0x80) == 0) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;
+  };
+
+  String line;
+  int lines = 0;
+  for (size_t i = 0; i < static_cast<size_t>(text.length()) && lines < maxLines; ) {
+    const size_t n = utf8Len(i);
+    const String token = text.substring(i, i + n);
+    i += n;
+    if (token == "\r") continue;
+    if (token == "\n") {
+      display_.drawString(line, x, y + lines * lineH);
+      line = "";
+      lines++;
+      continue;
+    }
+    const String candidate = line + token;
+    if (line.length() > 0 && display_.textWidth(candidate) > maxW) {
+      display_.drawString(line, x, y + lines * lineH);
+      line = token;
+      lines++;
+    } else {
+      line = candidate;
+    }
+  }
+  if (lines < maxLines && line.length() > 0) {
+    display_.drawString(line, x, y + lines * lineH);
+  }
+}
+
+void MemoUI::drawStatus(const char* badge, const String& title, const String& body,
+                        const String& hint, bool recording, float seconds)
+{
+  const int w = display_.width();
+  const int h = display_.height();
+  const int margin = max(24, w / 28);
+  const int topH = max(72, h / 8);
+  const int titleSize = (w >= 1200) ? 5 : 3;
+  const int bodySize  = (w >= 1200) ? 4 : 3;
+  const int smallSize = (w >= 1200) ? 3 : 2;
+
+  display_.fillSprite(kUiBg);
+  display_.fillRect(0, 0, w, topH, kUiCard);
+  display_.drawFastHLine(0, topH - 1, w, kUiLine);
+
+  display_.setTextDatum(TL_DATUM);
+  display_.setTextSize(smallSize);
+  display_.setTextColor(kUiText, kUiCard, true);
+  display_.drawString("Voice Memo", margin, topH / 2 - smallSize * 8);
+  display_.setTextColor(kUiMuted, kUiCard, true);
+  display_.drawString(VM_DEVICE_NAME, margin, topH / 2 + smallSize * 2);
+
+  {
+    const int padX = 18;
+    const int bh = 36;
+    display_.setTextSize(smallSize);
+    const int bw = display_.textWidth(badge) + padX * 2;
+    const int bx = w - margin - bw;
+    const int by = topH / 2 - bh / 2;
+    display_.fillRoundRect(bx, by, bw, bh, 10,
+                           recording ? kUiCardDark : kUiBadge);
+    display_.setTextColor(recording ? kUiTextInv : kUiText,
+                          recording ? kUiCardDark : kUiBadge, true);
+    display_.setTextDatum(MC_DATUM);
+    display_.drawString(badge, bx + bw / 2, by + bh / 2 - 1);
+  }
+
+  display_.setTextDatum(TL_DATUM);
+  display_.setTextSize(titleSize);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.drawString(title, margin, topH + margin);
+
+  if (recording) {
+    const int cx = w / 2;
+    const int cy = (topH + h) / 2;
+    for (int r = 36; r <= 120; r += 38) display_.drawCircle(cx, cy, r, kUiLine);
+    display_.fillCircle(cx, cy, 26, kUiText);
+    display_.setTextDatum(MC_DATUM);
+    display_.setTextSize((w >= 1200) ? 5 : 3);
+    display_.setTextColor(kUiText, kUiBg, true);
+    display_.drawString(String(seconds, 1) + "s", cx, cy + 156);
+    display_.setTextDatum(TL_DATUM);
+  } else {
+    const int textY = topH + margin + titleSize * 10 + 24;
+    const int lineH = (bodySize == 4) ? 46 : 34;
+    drawWrapped(body, margin, textY, w - margin * 2, lineH, bodySize, kUiText,
+                max(3, (h - textY - 100) / lineH));
+  }
+
+  display_.setTextSize(smallSize);
+  display_.setTextColor(kUiMuted, kUiBg, true);
+  display_.drawString(hint, margin, h - margin - 24);
+  display_.update();
+}
+
+void MemoUI::drawProcessing(const String& title, const String& body, const String& hint)
+{
+  const int w = display_.width();
+  const int h = display_.height();
+  const int margin = max(24, w / 28);
+  const int topH = max(72, h / 8);
+  const int titleSize = (w >= 1200) ? 5 : 3;
+  const int bodySize  = (w >= 1200) ? 4 : 3;
+  const int smallSize = (w >= 1200) ? 3 : 2;
+
+  display_.fillSprite(kUiBg);
+  display_.fillRect(0, 0, w, topH, kUiCard);
+  display_.drawFastHLine(0, topH - 1, w, kUiLine);
+
+  // Left: device label.
+  display_.setTextDatum(TL_DATUM);
+  display_.setTextSize(smallSize);
+  display_.setTextColor(kUiText, kUiCard, true);
+  display_.drawString("Voice Memo", margin, topH / 2 - smallSize * 8);
+  display_.setTextColor(kUiMuted, kUiCard, true);
+  display_.drawString(VM_DEVICE_NAME, margin, topH / 2 + smallSize * 2);
+
+  // Right: "PROCESSING" badge.
+  {
+    const char* badge = "PROCESSING";
+    const int padX = 18;
+    const int bh = 36;
+    display_.setTextSize(smallSize);
+    const int bw = display_.textWidth(badge) + padX * 2;
+    const int bx = w - margin - bw;
+    const int by = topH / 2 - bh / 2;
+    display_.fillRoundRect(bx, by, bw, bh, 10, kUiBadge);
+    display_.setTextColor(kUiText, kUiBadge, true);
+    display_.setTextDatum(MC_DATUM);
+    display_.drawString(badge, bx + bw / 2, by + bh / 2 - 1);
+  }
+
+  // ---- Spinner graphic (static, 8-segment ring) ----
+  const int cx = w / 2;
+  const int spinnerR = 56;
+  const int dotR = 10;
+  const int cy = topH + (h - topH) / 3;
+
+  // Draw 8 dots equally spaced around the ring. Vary the fill level to
+  // suggest rotation: three adjacent dots are solid, the rest are outlines.
+  for (int i = 0; i < 8; i++) {
+    const float angle = static_cast<float>(i) * (PI / 4.0f) - PI / 2.0f;
+    const int dx = static_cast<int>(cosf(angle) * spinnerR);
+    const int dy = static_cast<int>(sinf(angle) * spinnerR);
+    const bool filled = (i == 0 || i == 1 || i == 2);
+    if (filled) {
+      display_.fillCircle(cx + dx, cy + dy, dotR, kUiText);
+    } else {
+      display_.drawCircle(cx + dx, cy + dy, dotR, kUiLine);
+    }
+  }
+  // Centre dot anchors the spinner.
+  display_.fillCircle(cx, cy, dotR - 2, kUiText);
+
+  // ---- Title ----
+  display_.setTextDatum(TC_DATUM);
+  display_.setTextSize(titleSize);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.drawString(title, cx, cy + spinnerR + dotR + 30);
+
+  // ---- Body ----
+  const int bodyY = cy + spinnerR + dotR + 30 + titleSize * 10 + 16;
+  const int lineH = (bodySize == 4) ? 46 : 34;
+  drawWrapped(body, margin, bodyY, w - margin * 2, lineH, bodySize, kUiText,
+              max(2, (h - bodyY - 120) / lineH));
+
+  // ---- Hint ----
+  display_.setTextDatum(BC_DATUM);
+  display_.setTextSize(smallSize);
+  display_.setTextColor(kUiMuted, kUiBg, true);
+  display_.drawString(hint, cx, h - margin - 24);
+
+  display_.update();
+}
+
+void MemoUI::drawNotebookLogo(int x, int y, int size, uint16_t color)
+{
+  // Spiral rings: a row of small circles along the top edge.
+  const int ringR = size / 8;
+  const int ringY = y + ringR;
+  const int gaps  = 4;
+  const int step  = size / gaps;
+  for (int i = 0; i < gaps; i++) {
+    display_.drawCircle(x + step / 2 + i * step, ringY, ringR, color);
+  }
+
+  // Notebook body: rounded rectangle below the rings.
+  const int bodyY = y + ringR * 2 + 3;
+  const int bodyH = size - ringR * 2 - 3;
+  display_.drawRoundRect(x, bodyY, size, bodyH, 4, color);
+
+  // Three ruled lines inside the body.
+  const int lineX1 = x + size / 6;
+  const int lineX2 = x + size * 5 / 6;
+  display_.drawFastHLine(lineX1, bodyY + bodyH / 4,     lineX2 - lineX1,           color);
+  display_.drawFastHLine(lineX1, bodyY + bodyH / 2,     lineX2 - lineX1,           color);
+  display_.drawFastHLine(lineX1, bodyY + bodyH * 3 / 4, (lineX2 - lineX1) * 2 / 3, color);
+}
+
+void MemoUI::drawCheckbox(int cx, int cy, int size, bool done, uint16_t fg)
+{
+  const int x = cx - size / 2;
+  const int y = cy - size / 2;
+  if (done) {
+    // Filled square with a white check mark inside.
+    display_.fillRoundRect(x, y, size, size, 6, fg);
+    // Check mark: two strokes that meet at the bottom-left.
+    const int ax = x + size * 22 / 100, ay = y + size * 52 / 100;
+    const int bx = x + size * 42 / 100, by = y + size * 72 / 100;
+    const int dx = x + size * 78 / 100, dy = y + size * 28 / 100;
+    // Draw twice with +/- offset so the stroke is thick enough to read on
+    // ePaper without needing a fancy line-width primitive.
+    for (int d = -1; d <= 1; d++) {
+      display_.drawLine(ax, ay + d, bx, by + d, kUiBg);
+      display_.drawLine(bx, by + d, dx, dy + d, kUiBg);
+      display_.drawLine(ax + d, ay, bx + d, by, kUiBg);
+      display_.drawLine(bx + d, by, dx + d, dy, kUiBg);
+    }
+  } else {
+    display_.drawRoundRect(x, y,     size,     size,     6, fg);
+    display_.drawRoundRect(x + 1, y + 1, size - 2, size - 2, 6, fg);
+  }
+}
+
+void MemoUI::drawCard(int x, int y, int w, int h,
+                      const MemoEntry& entry, time_t nowEpoch,
+                      HitRect& outHit)
+{
+  // Pick palette based on done / overdue state.
+  uint16_t fill;
+  uint16_t fg;
+  if (entry.done) {
+    fill = kUiCardDone;
+    fg   = kUiMuted;       // grayed text for completed items
+  } else if (entry.hasDue && nowEpoch > 0 && entry.dueEpoch < nowEpoch) {
+    fill = kUiCardDark;
+    fg   = kUiTextInv;
+  } else {
+    fill = kUiCard;
+    fg   = kUiText;
+  }
+  const bool overdue = (fill == kUiCardDark);
+
+  display_.fillRoundRect(x, y, w, h, 14, fill);
+
+  // ---- Checkbox (left, vertically centered) ----
+  const int boxSize = 56;
+  const int boxCx   = x + 24 + boxSize / 2;
+  const int boxCy   = y + h / 2;
+  drawCheckbox(boxCx, boxCy, boxSize, entry.done, fg);
+
+  // Generous hit zone: the entire left strip of the card, not just the
+  // visible box, so a tap with a fingertip is easy to land.
+  outHit.x = x;
+  outHit.y = y;
+  outHit.w = 24 + boxSize + 24;   // up to the start of the memo text
+  outHit.h = h;
+  outHit.valid = true;
+
+  // Layout common to both right-side rendering modes.
+  const int memoX    = x + 24 + boxSize + 24;
+  const int rightPad = 28;
+  const int rightW   = 360;
+  const int memoMaxW = (x + w - rightPad - rightW) - memoX;
+
+  // ---- Right side: date chip (top) + time or time-of-day label (bottom) ----
+  {
+    String dateChip, timeBig;
+    bool   over = false;
+    formatDueLabel(nowEpoch, entry, dateChip, timeBig, over);
+
+    // If a time-of-day label is set (AM/PM/Noon/Eve), use it instead of HH:MM.
+    if (entry.fuzzyLabel.length() > 0) {
+      timeBig = entry.fuzzyLabel;
+    }
+
+    // Date chip (top right).
+    display_.setTextSize(3);
+    const int chipPad = 18;
+    const int chipH   = 38;
+    const int chipW   = display_.textWidth(dateChip) + chipPad * 2;
+    const int chipX   = x + w - rightPad - chipW;
+    const int chipY   = y + 18;
+    const uint16_t chipFill = overdue ? kUiCardDark
+                               : (entry.done ? kUiMuted : kUiBadge);
+    display_.fillRoundRect(chipX, chipY, chipW, chipH, 8, chipFill);
+    display_.setTextDatum(MC_DATUM);
+    display_.setTextColor(kUiTextInv, chipFill, true);
+    display_.drawString(dateChip, chipX + chipW / 2, chipY + chipH / 2 - 1);
+
+    // Big time / time-of-day label (bottom right).
+    display_.setTextSize(6);
+    display_.setTextColor(fg, fill, true);
+    display_.setTextDatum(TR_DATUM);
+    display_.drawString(timeBig, x + w - rightPad, y + h - 22 - 48);
+  }
+
+  // ---- Memo text ----
+  const int memoSize  = 4;
+  const int memoLineH = 42;
+  const int oneLineW  = display_.textWidth(entry.text);
+
+  display_.setTextSize(memoSize);
+  display_.setTextColor(fg, fill, true);
+  display_.setTextDatum(TL_DATUM);
+
+  if (oneLineW <= memoMaxW) {
+    display_.drawString(entry.text, memoX, y + h / 2 - memoSize * 6);
+  } else {
+    drawWrapped(entry.text, memoX, y + 24, memoMaxW, memoLineH,
+                memoSize, fg, 2);
+  }
+}
+
+void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
+                          const char* status, const String& hint)
+{
+  const time_t nowEpoch = rtc.nowEpoch();
+  store.sortByDue(nowEpoch);
+
+  // Reset hit cache. Cards that get drawn refill their slot.
+  for (size_t i = 0; i < MemoStore::kMax; i++) checkboxHits_[i].valid = false;
+
+#if VM_SCREEN_MODE == VM_SCREEN_GRAY16
+  const int w = display_.width();
+  const int h = display_.height();
+  const int margin = 80;
+
+  // ---- Header geometry ----
+  const int logoSize = 48;
+  const int logoY    = 20;
+  const int timeY    = logoY + logoSize + 8;      // top of big time text
+  const int dateY    = timeY + 8 * 8 + 8;         // top of date label (textSize 8 ~ 64px)
+  const int headerH  = dateY + 4 * 8 + 16;        // textSize 4 ~ 32px, +margin
+
+  display_.fillSprite(kUiBg);
+
+  // ---- Logo + "Notes" (left) ----
+  drawNotebookLogo(margin, logoY, logoSize, kUiText);
+  display_.setTextSize(3);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.setTextDatum(ML_DATUM);
+  display_.drawString("Notes", margin + logoSize + 12, logoY + logoSize / 2);
+
+  // ---- Status badge (right, vertically aligned with logo) ----
+  {
+    display_.setTextSize(3);
+    const int padX = 18;
+    const int bh   = 38;
+    const int bw   = display_.textWidth(status) + padX * 2;
+    const int bx   = w - margin - bw;
+    const int by   = logoY + (logoSize - bh) / 2;
+    display_.fillRoundRect(bx, by, bw, bh, 8, kUiBadge);
+    display_.setTextDatum(MC_DATUM);
+    display_.setTextColor(kUiTextInv, kUiBadge, true);
+    display_.drawString(status, bx + bw / 2, by + bh / 2 - 1);
+  }
+
+  // ---- Big time (centered) ----
+  display_.setTextSize(8);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.setTextDatum(TC_DATUM);
+  display_.drawString(rtc.nowTimeLabel(), w / 2, timeY);
+
+  // ---- Long date label (centered, below time) ----
+  display_.setTextSize(4);
+  display_.setTextColor(kUiText, kUiBg, true);
+  display_.setTextDatum(TC_DATUM);
+  display_.drawString(rtc.nowLongDateLabel(), w / 2, dateY);
+
+  display_.drawFastHLine(margin, headerH, w - margin * 2, kUiLine);
+
+  // ---- Card list ----
+  const int footerH = 100;
+  const int listTop = headerH + 24;
+  const int listBottom = h - footerH;
+  const int listAvail = listBottom - listTop;
+  const int rowH = listAvail / static_cast<int>(MemoStore::kMax);
+  const int gap = 8;
+  const int cardH = rowH - gap;
+  const int cardW = w - margin * 2;
+
+  if (store.count() == 0) {
+    display_.setTextDatum(MC_DATUM);
+    display_.setTextSize(4);
+    display_.setTextColor(kUiMuted, kUiBg, true);
+    display_.drawString("Hold KEY0 and speak to add your first reminder.",
+                        w / 2, listTop + listAvail / 2);
+  } else {
+    for (size_t i = 0; i < store.count(); i++) {
+      const int cardY = listTop + static_cast<int>(i) * rowH + gap / 2;
+      drawCard(margin, cardY, cardW, cardH, store.at(i), nowEpoch,
+               checkboxHits_[i]);
+    }
+  }
+
+  // ---- Footer ----
+  display_.setTextDatum(BL_DATUM);
+  display_.setTextSize(3);
+  display_.setTextColor(kUiMuted, kUiBg, true);
+  display_.drawString(hint, margin, h - 36);
+
+  display_.setTextDatum(BR_DATUM);
+  display_.drawString(String(store.count()) + "/" + String(MemoStore::kMax),
+                      w - margin, h - 36);
+  display_.update();
+#else
+  // Smaller panels stay on the wrapped text fallback. Touch toggling is
+  // disabled there because there is no touch hardware on E1001 / E1002.
+  String body;
+  if (store.count() == 0) {
+    body = "No reminders yet. Hold KEY0 to add the first one.";
+  } else {
+    for (size_t i = 0; i < store.count(); i++) {
+      String chip, big;
+      bool over = false;
+      const MemoEntry& e = store.at(i);
+      body += e.done ? "[x] " : "[ ] ";
+      if (e.fuzzyLabel.length() > 0) {
+        body += "[";
+        body += e.fuzzyLabel;
+        body += "]  ";
+      } else {
+        formatDueLabel(nowEpoch, e, chip, big, over);
+        body += "[";
+        body += chip;
+        body += " ";
+        body += big;
+        body += "]  ";
+      }
+      body += e.text;
+      if (i + 1 < store.count()) body += "\n";
+    }
+  }
+  drawStatus(status, "Reminders", body, hint, false, 0.0f);
+#endif
+}
+
+int MemoUI::hitTestCheckbox(int x, int y) const
+{
+  for (size_t i = 0; i < MemoStore::kMax; i++) {
+    const HitRect& r = checkboxHits_[i];
+    if (!r.valid) continue;
+    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}

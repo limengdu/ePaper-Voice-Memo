@@ -1,0 +1,34 @@
+#ifndef VOICE_MEMO_REMINDER_DRIVER_H
+#define VOICE_MEMO_REMINDER_DRIVER_H
+
+// Select exactly one target. E1004 is intentionally not listed because it has
+// no onboard microphone.
+//
+// #define VOICE_MEMO_DEVICE_E1001
+// #define VOICE_MEMO_DEVICE_E1002
+#define VOICE_MEMO_DEVICE_E1003
+
+#define VM_SCREEN_GRAY4   1
+#define VM_SCREEN_COLOR6  2
+#define VM_SCREEN_GRAY16  3
+
+#if defined(VOICE_MEMO_DEVICE_E1001)
+  #define BOARD_SCREEN_COMBO 520
+  #define VM_DEVICE_NAME "reTerminal E1001"
+  #define VM_SCREEN_MODE VM_SCREEN_GRAY4
+  #define VM_LED_PIN 6
+#elif defined(VOICE_MEMO_DEVICE_E1002)
+  #define BOARD_SCREEN_COMBO 521
+  #define VM_DEVICE_NAME "reTerminal E1002"
+  #define VM_SCREEN_MODE VM_SCREEN_COLOR6
+  #define VM_LED_PIN 6
+#elif defined(VOICE_MEMO_DEVICE_E1003)
+  #define BOARD_SCREEN_COMBO 522
+  #define VM_DEVICE_NAME "reTerminal E1003"
+  #define VM_SCREEN_MODE VM_SCREEN_GRAY16
+  #define VM_LED_PIN 16
+#else
+  #error "Select VOICE_MEMO_DEVICE_E1001, VOICE_MEMO_DEVICE_E1002, or VOICE_MEMO_DEVICE_E1003."
+#endif
+
+#endif
