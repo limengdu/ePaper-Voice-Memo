@@ -50,8 +50,9 @@ void test_label_day_after() {
     TEST_ASSERT_EQUAL_STRING("Day after", vmDateChipLabel(2, 0));
 }
 
-void test_label_weekday_wed() {
-    TEST_ASSERT_EQUAL_STRING("Wed",       vmDateChipLabel(3, 3));
+void test_label_weekday_full() {
+    TEST_ASSERT_EQUAL_STRING("Wednesday", vmDateChipLabel(3, 3));
+    TEST_ASSERT_EQUAL_STRING("Sunday",    vmDateChipLabel(5, 0));
 }
 
 void test_label_null_for_seven_plus() {
@@ -69,7 +70,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_label_today);
     RUN_TEST(test_label_tomorrow);
     RUN_TEST(test_label_day_after);
-    RUN_TEST(test_label_weekday_wed);
+    RUN_TEST(test_label_weekday_full);
     RUN_TEST(test_label_null_for_seven_plus);
     return UNITY_END();
 }

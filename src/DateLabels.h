@@ -22,7 +22,8 @@ inline int vmDayDistance(time_t from, time_t to)
 inline const char* vmDateChipLabel(int days, int wday)
 {
     static const char* kWeekdays[] = {
-        "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+        "Sunday", "Monday", "Tuesday", "Wednesday",
+        "Thursday", "Friday", "Saturday"
     };
     if (days == 0) return "Today";
     if (days == 1) return "Tomorrow";
