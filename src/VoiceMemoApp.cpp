@@ -113,9 +113,7 @@ void VoiceMemoApp::begin()
   Serial1.println("=========================================");
 
   ui_.begin();
-  ui_.drawStatus("BOOT", "Starting",
-                 "Allocating audio buffer and initializing microphone.",
-                 "Use Serial1 on GPIO43/GPIO44 for logs.", false, 0.0f);
+  ui_.drawBoot(rtc_, "Starting...", currentStatus(false));
 
   if (!audio_.begin(config_.audio.sampleRate, config_.audio.maxRecordSeconds,
                     kMicClkPin, kMicDataPin, kMicPwrEnPin)) {
@@ -132,10 +130,7 @@ void VoiceMemoApp::begin()
   stt_.configure(config_.speech, config_.httpTimeoutMs);
   memo_.configure(config_.memo,  config_.httpTimeoutMs);
 
-  ui_.drawStatus("WIFI", "Connecting",
-                 "Connecting to WiFi before the first recording.",
-                 "Edit WiFi, API key, and provider settings in the .ino file.",
-                 false, 0.0f);
+  ui_.drawBoot(rtc_, "Connecting WiFi...", currentStatus(false));
   ensureWiFi(15000);
 
   ui_.drawTodoList(store_, rtc_, currentStatus(false),
