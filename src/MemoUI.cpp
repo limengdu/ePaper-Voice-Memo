@@ -473,7 +473,7 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   renderer_.drawText(hint, margin, h - 36, 3,
                      TextAlign::BottomLeft, kUiText, kUiBg);
   if (quote.length() > 0 && quoteW > 80) {
-    drawWrapped(quote, quoteX, h - 60, quoteW, 28, 2, kUiMuted, 2);
+    drawWrapped(quote, quoteX, h - 76, quoteW, 34, 3, kUiMuted, 2);
   }
   display_.update();
 #else
