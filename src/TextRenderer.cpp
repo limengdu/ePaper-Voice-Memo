@@ -56,6 +56,15 @@ bool TextRenderer::begin(EPaper& display)
   display_ = &display;
 #if VM_LANG_ZH
   g_ofr.setDrawer(static_cast<TFT_eSPI&>(display));
+  // EPaper is a TFT_eSprite: it overrides the virtual drawPixel (which writes
+  // the sprite buffer) but not drawFastHLine. setDrawer binds the hooks through
+  // a TFT_eSPI& reference, so OFR's horizontal fills resolve to the base
+  // TFT_eSPI hardware path and never reach the sprite -- leaving glyph interiors
+  // blank (hollow text). Re-bind the line hook to a drawPixel loop, which is
+  // virtual and lands in the sprite, so filled runs render solid.
+  g_ofr.set_drawFastHLine([&display](int32_t hx, int32_t hy, int32_t hw, uint16_t hc) {
+    for (int32_t i = 0; i < hw; ++i) display.drawPixel(hx + i, hy, hc);
+  });
   // loadFont returns non-zero on failure. The font is embedded in flash
   // (FontZH.h), so there is no filesystem to mount.
   if (g_ofr.loadFont(vm_font_zh, vm_font_zh_len)) {
