@@ -426,7 +426,8 @@ void MemoUI::drawBoot(RtcClock& rtc, const String& statusText, const UiStatus& s
 }
 
 void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
-                          const UiStatus& status, const String& hint)
+                          const UiStatus& status, const String& hint,
+                          const String& quote)
 {
   const time_t nowEpoch = rtc.nowEpoch();
   store.sortByDue(nowEpoch);
@@ -467,11 +468,13 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   }
 
   // ---- Footer ----
+  const int quoteX = margin + renderer_.measureText(hint, 3) + 56;
+  const int quoteW = w - margin - quoteX;
   renderer_.drawText(hint, margin, h - 36, 3,
                      TextAlign::BottomLeft, kUiText, kUiBg);
-  renderer_.drawText(String(store.count()) + "/" + String(MemoStore::kMax),
-                     w - margin, h - 36, 3,
-                     TextAlign::BottomRight, kUiText, kUiBg);
+  if (quote.length() > 0 && quoteW > 80) {
+    drawWrapped(quote, quoteX, h - 60, quoteW, 28, 2, kUiMuted, 2);
+  }
   display_.update();
 #else
   // Smaller panels stay on the wrapped text fallback. Touch toggling is

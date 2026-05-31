@@ -23,6 +23,7 @@
 #include <Arduino.h>
 
 #include "AudioCapture.h"
+#include "DailyQuoteClient.h"
 #include "MemoClient.h"
 #include "MemoStore.h"
 #include "MemoUI.h"
@@ -74,6 +75,7 @@ class VoiceMemoApp {
   static constexpr int kBatteryAdcPin    = 1;
 
   static constexpr unsigned long kDebounceDelayMs = 35;
+  static constexpr unsigned long kListRefreshMs = 5UL * 60UL * 1000UL;
 
   const VoiceMemoConfig config_;
 
@@ -82,6 +84,7 @@ class VoiceMemoApp {
   MemoStore    store_;
   SpeechClient stt_;
   MemoClient   memo_;
+  DailyQuoteClient quote_;
   MemoUI       ui_;
   TouchInput   touch_;
 
@@ -93,6 +96,7 @@ class VoiceMemoApp {
   bool          ledState_;
   unsigned long debounceMs_;
   unsigned long lastBlinkMs_;
+  unsigned long lastListRefreshMs_;
 
   void setupPins();
   void ledOn();
@@ -104,9 +108,11 @@ class VoiceMemoApp {
 
   void pollButton();
   void pollTouch();
+  void pollScheduledRefresh();
   void startRecording();
   void stopRecording(bool forced);
   void captureChunk();
+  void drawTodoList(const String& hint, bool processing, bool allowQuoteNetwork);
 };
 
 #endif  // VOICE_MEMO_APP_H

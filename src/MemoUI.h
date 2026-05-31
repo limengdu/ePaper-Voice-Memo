@@ -57,7 +57,8 @@ class MemoUI {
   void drawTodoList(MemoStore& store,
                     RtcClock& rtc,
                     const UiStatus& status,
-                    const String& hint);
+                    const String& hint,
+                    const String& quote);
 
   // One-page boot/splash screen reusing the header.
   void drawBoot(RtcClock& rtc, const String& statusText, const UiStatus& status);

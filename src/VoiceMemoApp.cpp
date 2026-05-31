@@ -12,6 +12,7 @@ VoiceMemoApp::VoiceMemoApp(const VoiceMemoConfig& config)
     store_(),
     stt_(),
     memo_(),
+    quote_(),
     ui_(),
     touch_(),
     recording_(false),
@@ -20,7 +21,8 @@ VoiceMemoApp::VoiceMemoApp(const VoiceMemoConfig& config)
     stableButton_(HIGH),
     ledState_(false),
     debounceMs_(0),
-    lastBlinkMs_(0)
+    lastBlinkMs_(0),
+    lastListRefreshMs_(0)
 {
 }
 
@@ -29,9 +31,9 @@ void VoiceMemoApp::ledOff() { digitalWrite(VM_LED_PIN, HIGH); }
 
 void VoiceMemoApp::beepStart()
 {
-  // Short, bright beep at recording start. Audible feedback lets the user
-  // start speaking without having to look at the screen.
-  tone(kBuzzerPin, 1500, 80);
+  // Short, brighter beep at recording start.
+  // 短促且更明显的录音开始提示音。
+  tone(kBuzzerPin, 2500, 180);
 }
 
 void VoiceMemoApp::setupPins()
@@ -64,6 +66,19 @@ UiStatus VoiceMemoApp::currentStatus(bool processing)
   s.batteryPercent = readBatteryPercent();
   s.processing     = processing;
   return s;
+}
+
+void VoiceMemoApp::drawTodoList(const String& hint, bool processing,
+                                bool allowQuoteNetwork)
+{
+  const time_t nowEpoch = rtc_.nowEpoch();
+  bool quoteNetworkReady = false;
+  if (allowQuoteNetwork && quote_.needsRefresh(nowEpoch)) {
+    quoteNetworkReady = (WiFi.status() == WL_CONNECTED) || ensureWiFi(5000);
+  }
+  quote_.refreshIfNeeded(nowEpoch, quoteNetworkReady);
+  ui_.drawTodoList(store_, rtc_, currentStatus(processing), hint, quote_.quote());
+  lastListRefreshMs_ = millis();
 }
 
 bool VoiceMemoApp::ensureWiFi(uint32_t timeoutMs)
@@ -132,12 +147,13 @@ void VoiceMemoApp::begin()
   store_.begin();
   stt_.configure(config_.speech, config_.httpTimeoutMs);
   memo_.configure(config_.memo,  config_.httpTimeoutMs);
+  quote_.configure(config_.memo, config_.httpTimeoutMs);
+  quote_.begin(rtc_.nowEpoch());
 
   ui_.drawBoot(rtc_, uiStr(UiStringId::kBootWifi), currentStatus(false));
   ensureWiFi(15000);
 
-  ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                   uiStr(UiStringId::kHintAdd));
+  drawTodoList(uiStr(UiStringId::kHintAdd), false, true);
 }
 
 void VoiceMemoApp::startRecording()
@@ -170,8 +186,7 @@ void VoiceMemoApp::stopRecording(bool forced)
                  static_cast<unsigned>(audio_.audioBytes()));
 
   if (audio_.tooShort()) {
-    ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                     uiStr(UiStringId::kHintTooShort));
+    drawTodoList(uiStr(UiStringId::kHintTooShort), false, false);
     busy_ = false;
     return;
   }
@@ -183,14 +198,12 @@ void VoiceMemoApp::stopRecording(bool forced)
   // DMA ring and lose audio samples.
   // Inline processing state: keep the list visible, show "Processing" in the
   // header. Safe to refresh here -- audio capture is already complete.
-  ui_.drawTodoList(store_, rtc_, currentStatus(true),
-                   uiStr(UiStringId::kHintAdd));
+  drawTodoList(uiStr(UiStringId::kHintAdd), true, false);
   ledOn();   // solid LED through the network call as a second cue
 
   if (!ensureWiFi(10000)) {
     ledOff();
-    ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                     uiStr(UiStringId::kHintNoWifi));
+    drawTodoList(uiStr(UiStringId::kHintNoWifi), false, false);
     busy_ = false;
     return;
   }
@@ -215,7 +228,7 @@ void VoiceMemoApp::stopRecording(bool forced)
   const String hint = forced
       ? uiStr(UiStringId::kHintMaxLen)
       : uiStr(UiStringId::kHintAdd);
-  ui_.drawTodoList(store_, rtc_, currentStatus(false), hint);
+  drawTodoList(hint, false, true);
 
   busy_ = false;
 }
@@ -270,8 +283,14 @@ void VoiceMemoApp::pollTouch()
 
   Serial1.printf("[touch] toggle row %d\n", idx);
   store_.toggleDone(static_cast<size_t>(idx));
-  ui_.drawTodoList(store_, rtc_, currentStatus(false),
-                   uiStr(UiStringId::kHintAdd));
+  drawTodoList(uiStr(UiStringId::kHintAdd), false, false);
+}
+
+void VoiceMemoApp::pollScheduledRefresh()
+{
+  if (recording_ || busy_) return;
+  if (millis() - lastListRefreshMs_ < kListRefreshMs) return;
+  drawTodoList(uiStr(UiStringId::kHintAdd), false, true);
 }
 
 void VoiceMemoApp::loop()
@@ -279,4 +298,5 @@ void VoiceMemoApp::loop()
   pollButton();
   captureChunk();
   pollTouch();
+  pollScheduledRefresh();
 }

@@ -15,6 +15,8 @@ VoiceMemoReminder 不是普通录音机。它会把一句自然语言变成一�
 - 🎙️ **说话即记录**：按住 KEY0 开始录音，松手后自动上传 WAV 到语音识别 API。
 - 🧠 **AI 理解时间**：例如“明早九点开会”“今晚八点买菜”，会被整理成提醒内容和触发时间。
 - 🖋️ **电子墨水屏常驻显示**：低功耗、少打扰，适合放在桌面当待办提醒板。
+- ⏱️ **时间自动刷新**：空闲时每 5 分钟刷新一次屏幕，顶部时间不会停在上次录音结束的瞬间。
+- ☀️ **每日一句**：底部右侧显示当天生成的鼓励短句，跨天后自动更新，中文固件显示中文，英文固件显示英文。
 
 ## 功能展示
 
@@ -38,6 +40,12 @@ E1003 的卡片式界面每页最多显示 8 条备忘录。每条卡片都包�
 ![完成状态示意图](docs/assets/readme/feature-done.png)
 
 点一下卡片左侧方框即可标记完成。完成项会自动变灰，并下沉到列表底部，让未完成事项始终保持在视觉中心。列表满了以后，新提醒会优先覆盖已完成项目，减少手动整理成本。
+
+### 每 5 分钟刷新时间和每日一句
+
+屏幕会在空闲时每 5 分钟自动刷新一次。它会更新顶部时间、日期、逾期状态和排序；如果这次刷新刚好跨过新的一天，还会通过同一个 Groq Chat Completions API 生成新的每日一句。
+
+每日一句会缓存在 NVS 中，同一天重启不会反复消耗 API。网络不可用时会保留旧句子；没有旧句子时显示本地默认短句。
 
 ### 断电也不会丢
 
@@ -64,6 +72,7 @@ E1003 的卡片式界面每页最多显示 8 条备忘录。每条卡片都包�
 | --- | --- | --- |
 | 语音识别 | `whisper-large-v3-turbo` | 把录音转成文字 |
 | 提醒整理 | `llama-3.3-70b-versatile` | 从文字里提取提醒和时间 |
+| 每日一句 | `llama-3.3-70b-versatile` | 每天生成一句鼓励短句 |
 
 Groq 免费计划不会直接扣费，超过免费限制时通常返回 `429`。截至 2026-05-31，官方 Limits 页展示的免费层级摘要如下，实际额度请以 [Groq Console Limits](https://console.groq.com/docs/rate-limits) 为准：
 
@@ -139,6 +148,8 @@ flowchart LR
   C --> D[LLM extracts memo and due time]
   D --> E[Save to NVS]
   E --> F[Sort and render on e-paper]
+  G[Every 5 minutes] --> H[Refresh time and daily quote]
+  H --> F
 ```
 
 核心数据流：
@@ -159,6 +170,7 @@ flowchart LR
 | `AudioCapture.*` | 麦克风录音和 WAV 缓冲 |
 | `SpeechClient.*` | 语音识别上传 |
 | `MemoClient.*` | LLM 提醒提取 |
+| `DailyQuoteClient.*` | 每日一句生成和 NVS 缓存 |
 | `MemoStore.*` | NVS 保存、排序、完成状态 |
 | `MemoUI.*` | 电子墨水屏绘制和触摸命中 |
 | `TextRenderer.*` | 英文/中文文本渲染 |
