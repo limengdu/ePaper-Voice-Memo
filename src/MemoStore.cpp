@@ -2,6 +2,7 @@
 
 #include <Preferences.h>
 
+#include "DisplayText.h"
 #include "UiLang.h"
 
 namespace {
@@ -127,6 +128,7 @@ bool MemoStore::load()
     for (uint16_t j = 0; j < tlen; j++) {
       e.text += static_cast<char>(buf[offset + j]);
     }
+    e.text = vmSanitizeDisplayText(e.text);
     offset += tlen;
 
     const uint16_t flen = readLE16(buf + offset); offset += 2;
@@ -136,6 +138,7 @@ bool MemoStore::load()
     for (uint16_t j = 0; j < flen; j++) {
       e.fuzzyLabel += static_cast<char>(buf[offset + j]);
     }
+    e.fuzzyLabel = vmSanitizeDisplayText(e.fuzzyLabel);
     offset += flen;
   }
   return count_ > 0;
@@ -180,8 +183,12 @@ bool MemoStore::save()
 
 bool MemoStore::add(const MemoEntry& entry)
 {
+  MemoEntry clean = entry;
+  clean.text = vmSanitizeDisplayText(clean.text);
+  clean.fuzzyLabel = vmSanitizeDisplayText(clean.fuzzyLabel);
+
   if (count_ < kMax) {
-    items_[count_++] = entry;
+    items_[count_++] = clean;
     return save();
   }
 
@@ -196,7 +203,7 @@ bool MemoStore::add(const MemoEntry& entry)
   for (size_t i = static_cast<size_t>(evictIdx); i + 1 < kMax; i++) {
     items_[i] = items_[i + 1];
   }
-  items_[kMax - 1] = entry;
+  items_[kMax - 1] = clean;
   return save();
 }
 

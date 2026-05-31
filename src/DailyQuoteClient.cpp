@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <WiFiClientSecure.h>
 
+#include "DisplayText.h"
 #include "JsonUtil.h"
 #include "UiLang.h"
 
@@ -85,7 +86,7 @@ int DailyQuoteClient::dateKey(time_t epoch)
 const char* DailyQuoteClient::fallbackQuote()
 {
 #if VM_LANG_ZH
-  return "今天也要稳稳发光，哪怕只是省电模式。";
+  return "今天也要稳稳发光 哪怕只是省电模式";
 #else
   return "Tiny steps count, especially when they fit on e-paper.";
 #endif
@@ -108,7 +109,7 @@ bool DailyQuoteClient::load()
   }
 
   cachedDateKey_ = prefs.getInt(kNvsDateKey, 0);
-  quote_ = prefs.getString(kNvsQuoteKey, "");
+  quote_ = vmSanitizeDisplayText(prefs.getString(kNvsQuoteKey, ""));
   prefs.end();
   return quote_.length() > 0;
 }
@@ -165,7 +166,8 @@ bool DailyQuoteClient::requestQuote(time_t nowEpoch, String& outQuote)
   system += "Return ONLY JSON: {\\\"quote\\\":\\\"...\\\"}. ";
   system += "The quote must be Simplified Chinese, one sentence, under 28 Chinese characters, ";
   system += "positive, encouraging, lightly funny, and suitable for a desk reminder. ";
-  system += "No emoji, no markdown, no quotation marks inside the value.";
+  system += "No punctuation, no emoji, no markdown, no quotation marks inside the value. ";
+  system += "Use a space instead of punctuation if a pause is needed.";
 #else
   system += "Return ONLY JSON: {\\\"quote\\\":\\\"...\\\"}. ";
   system += "The quote must be English, one sentence, under 12 words, ";
@@ -209,7 +211,7 @@ bool DailyQuoteClient::requestQuote(time_t nowEpoch, String& outQuote)
 
   const String content = voice_memo::jsonStringValue(response, "content");
   const String obj = voice_memo::jsonExtractObject(content.length() ? content : response);
-  const String quote = trimQuote(voice_memo::jsonStringValue(obj, "quote"));
+  const String quote = vmSanitizeDisplayText(trimQuote(voice_memo::jsonStringValue(obj, "quote")));
   if (quote.length() == 0) return false;
 
   outQuote = quote;

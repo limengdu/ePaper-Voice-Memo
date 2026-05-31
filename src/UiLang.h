@@ -62,17 +62,17 @@ inline const char* uiStrZh(UiStringId id) {
   switch (id) {
     case UiStringId::kAppName:      return "语音备忘录";
     case UiStringId::kHintAdd:      return "长按 KEY0 添加  点方框勾选完成";
-    case UiStringId::kHintTooShort: return "请长按 KEY0 至少一秒。";
-    case UiStringId::kHintNoWifi:   return "WiFi 不可用，本次提醒未保存。";
-    case UiStringId::kHintMaxLen:   return "已到最长录音，再次长按 KEY0 继续。";
-    case UiStringId::kEmptyList:    return "长按 KEY0 说话，添加第一条提醒。";
+    case UiStringId::kHintTooShort: return "请长按 KEY0 至少一秒";
+    case UiStringId::kHintNoWifi:   return "WiFi 不可用 本次提醒未保存";
+    case UiStringId::kHintMaxLen:   return "已到最长录音 再次长按 KEY0 继续";
+    case UiStringId::kEmptyList:    return "长按 KEY0 说话 添加第一条提醒";
     case UiStringId::kProcessing:   return "处理中";
     case UiStringId::kReminders:    return "提醒";
-    case UiStringId::kBootStarting: return "启动中…";
-    case UiStringId::kBootWifi:     return "连接 WiFi…";
+    case UiStringId::kBootStarting: return "启动中";
+    case UiStringId::kBootWifi:     return "连接 WiFi";
     case UiStringId::kSomeDay:      return "某天";
     case UiStringId::kOverdue:      return "已逾期";
-    case UiStringId::kNoSpeech:     return "未识别到语音。";
+    case UiStringId::kNoSpeech:     return "未识别到语音";
     default:                        return "";
   }
 }

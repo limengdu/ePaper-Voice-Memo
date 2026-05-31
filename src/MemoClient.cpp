@@ -5,6 +5,7 @@
 #include <ctype.h>
 
 #include "JsonUtil.h"
+#include "DisplayText.h"
 #include "UiLang.h"
 
 namespace {
@@ -142,7 +143,7 @@ MemoEntry MemoClient::summarizeWithRule(const String& transcript, time_t nowEpoc
   const char last = text.length() ? text[text.length() - 1] : '.';
   if (last != '.' && last != '!' && last != '?') text += '.';
 
-  e.text = text;
+  e.text = vmSanitizeDisplayText(text);
   return e;
 }
 
@@ -175,6 +176,7 @@ MemoEntry MemoClient::summarizeOpenAICompatible(const String& transcript,
   system += "{\\\"memo\\\":\\\"<简短中文提醒>\\\",\\\"due\\\":\\\"YYYY-MM-DD HH:MM\\\",\\\"due_label\\\":\\\"<时段词或留空>\\\"}\\n\\n";
   system += "字段规则:\\n";
   system += "1) memo: 一句简洁的中文提醒, 去掉口头语, 不要以\\\"记得\\\"开头。\\n";
+  system += "   memo 中不要使用任何标点符号; 需要停顿时用空格。\\n";
   system += "2) due: 始终给出一个绝对的本地日期时间, 基于当前本地时间做最合理推断。\\n";
   system += "3) due_label: 只用来区分一天中的时段。\\n";
   system += "   - 已给出具体钟点(如 8、14:30、3点) -> due_label = \\\"\\\" (设备显示 HH:MM)。\\n";
@@ -277,9 +279,9 @@ MemoEntry MemoClient::summarizeOpenAICompatible(const String& transcript,
   if (memo.length() == 0) return buildFallback(transcript, nowEpoch);
 
   MemoEntry e;
-  e.text       = memo;
+  e.text       = vmSanitizeDisplayText(memo);
   e.done       = false;
-  e.fuzzyLabel = voice_memo::jsonStringValue(obj, "due_label");
+  e.fuzzyLabel = vmSanitizeDisplayText(voice_memo::jsonStringValue(obj, "due_label"));
   // Defense in depth: cap the fuzzy label so a chatty model cannot break
   // the right-side layout. The prompt asks for max 10 chars already.
   if (e.fuzzyLabel.length() > 12) {

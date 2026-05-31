@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <string.h>
+#include "DisplayText.h"
 #include "UiLang.h"
 
 // The string table is exposed as two columns (uiStrEn / uiStrZh) so this one
@@ -25,6 +26,16 @@ void test_zh_hint_add_uses_spaces_instead_of_punctuation() {
     TEST_ASSERT_NOT_NULL(strstr(hint, "  "));
     TEST_ASSERT_NULL(strstr(hint, "，"));
     TEST_ASSERT_NULL(strstr(hint, "。"));
+}
+
+void test_zh_display_text_replaces_punctuation_with_spaces() {
+    const std::string text = vmSanitizeDisplayTextForLang("买苹果，香蕉。OK! \"Go?\"", true);
+    TEST_ASSERT_EQUAL_STRING("买苹果 香蕉 OK Go", text.c_str());
+}
+
+void test_en_display_text_keeps_punctuation() {
+    const std::string text = vmSanitizeDisplayTextForLang("Buy apples, then go.", false);
+    TEST_ASSERT_EQUAL_STRING("Buy apples, then go.", text.c_str());
 }
 
 // Every id must resolve to a non-empty string in both columns, and the two
@@ -56,6 +67,8 @@ int main(int argc, char **argv)
     RUN_TEST(test_en_column_spot_values);
     RUN_TEST(test_zh_column_spot_values);
     RUN_TEST(test_zh_hint_add_uses_spaces_instead_of_punctuation);
+    RUN_TEST(test_zh_display_text_replaces_punctuation_with_spaces);
+    RUN_TEST(test_en_display_text_keeps_punctuation);
     RUN_TEST(test_every_id_nonempty_and_distinct);
     RUN_TEST(test_wipe_when_tag_differs_or_missing);
     return UNITY_END();
