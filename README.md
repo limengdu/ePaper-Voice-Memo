@@ -1,5 +1,7 @@
 # VoiceMemoReminder
 
+[简体中文](README.zh-CN.md) · English
+
 Hold KEY0 to record a voice note, release KEY0 to upload the WAV to a cloud
 speech-to-text API, then let a small LLM rewrite the transcript into one short
 English reminder with an event date and time. The reminder is drawn on the

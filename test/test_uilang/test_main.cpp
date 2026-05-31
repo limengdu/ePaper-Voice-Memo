@@ -6,17 +6,25 @@
 // native build can assert both languages regardless of VM_LANG_ZH.
 
 void test_en_column_spot_values() {
-    TEST_ASSERT_EQUAL_STRING("Notes",      uiStrEn(UiStringId::kAppName));
+    TEST_ASSERT_EQUAL_STRING("Voice Memo", uiStrEn(UiStringId::kAppName));
     TEST_ASSERT_EQUAL_STRING("Processing", uiStrEn(UiStringId::kProcessing));
     TEST_ASSERT_EQUAL_STRING("Reminders",  uiStrEn(UiStringId::kReminders));
     TEST_ASSERT_EQUAL_STRING("Overdue",    uiStrEn(UiStringId::kOverdue));
 }
 
 void test_zh_column_spot_values() {
-    TEST_ASSERT_EQUAL_STRING("笔记",   uiStrZh(UiStringId::kAppName));
+    TEST_ASSERT_EQUAL_STRING("语音备忘录", uiStrZh(UiStringId::kAppName));
     TEST_ASSERT_EQUAL_STRING("处理中", uiStrZh(UiStringId::kProcessing));
     TEST_ASSERT_EQUAL_STRING("提醒",   uiStrZh(UiStringId::kReminders));
     TEST_ASSERT_EQUAL_STRING("已逾期", uiStrZh(UiStringId::kOverdue));
+}
+
+void test_zh_hint_add_uses_spaces_instead_of_punctuation() {
+    const char* hint = uiStrZh(UiStringId::kHintAdd);
+    TEST_ASSERT_EQUAL_STRING("长按 KEY0 添加  点方框勾选完成", hint);
+    TEST_ASSERT_NOT_NULL(strstr(hint, "  "));
+    TEST_ASSERT_NULL(strstr(hint, "，"));
+    TEST_ASSERT_NULL(strstr(hint, "。"));
 }
 
 // Every id must resolve to a non-empty string in both columns, and the two
@@ -47,6 +55,7 @@ int main(int argc, char **argv)
     UNITY_BEGIN();
     RUN_TEST(test_en_column_spot_values);
     RUN_TEST(test_zh_column_spot_values);
+    RUN_TEST(test_zh_hint_add_uses_spaces_instead_of_punctuation);
     RUN_TEST(test_every_id_nonempty_and_distinct);
     RUN_TEST(test_wipe_when_tag_differs_or_missing);
     return UNITY_END();

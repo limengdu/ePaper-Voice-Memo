@@ -170,7 +170,7 @@ void MemoUI::drawStatus(const char* badge, const String& title, const String& bo
   display_.fillRect(0, 0, w, topH, kUiCard);
   display_.drawFastHLine(0, topH - 1, w, kUiLine);
 
-  renderer_.drawText("Voice Memo", margin, topH / 2 - smallSize * 8, smallSize,
+  renderer_.drawText(uiStr(UiStringId::kAppName), margin, topH / 2 - smallSize * 8, smallSize,
                      TextAlign::TopLeft, kUiText, kUiCard);
   renderer_.drawText(VM_DEVICE_NAME, margin, topH / 2 + smallSize * 2, smallSize,
                      TextAlign::TopLeft, kUiMuted, kUiCard);

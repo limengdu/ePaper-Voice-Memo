@@ -40,7 +40,7 @@ enum class UiStringId {
 // English column.
 inline const char* uiStrEn(UiStringId id) {
   switch (id) {
-    case UiStringId::kAppName:      return "Notes";
+    case UiStringId::kAppName:      return "Voice Memo";
     case UiStringId::kHintAdd:      return "Hold KEY0 to add. Tap a box to check off.";
     case UiStringId::kHintTooShort: return "Hold KEY0 for at least one second.";
     case UiStringId::kHintNoWifi:   return "Reminder skipped because WiFi is unavailable.";
@@ -60,8 +60,8 @@ inline const char* uiStrEn(UiStringId id) {
 // Chinese column.
 inline const char* uiStrZh(UiStringId id) {
   switch (id) {
-    case UiStringId::kAppName:      return "笔记";
-    case UiStringId::kHintAdd:      return "长按 KEY0 添加，点方框勾选完成。";
+    case UiStringId::kAppName:      return "语音备忘录";
+    case UiStringId::kHintAdd:      return "长按 KEY0 添加  点方框勾选完成";
     case UiStringId::kHintTooShort: return "请长按 KEY0 至少一秒。";
     case UiStringId::kHintNoWifi:   return "WiFi 不可用，本次提醒未保存。";
     case UiStringId::kHintMaxLen:   return "已到最长录音，再次长按 KEY0 继续。";
