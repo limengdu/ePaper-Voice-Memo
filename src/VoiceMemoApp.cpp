@@ -289,7 +289,20 @@ void VoiceMemoApp::pollTouch()
 void VoiceMemoApp::pollScheduledRefresh()
 {
   if (recording_ || busy_) return;
-  if (millis() - lastListRefreshMs_ < kListRefreshMs) return;
+  const unsigned long now = millis();
+  if (now - lastListRefreshMs_ < kListRefreshMs) return;
+
+  // KEY0 wins over the timed e-paper refresh, including the debounce window.
+  // KEY0 优先级高于定时刷屏  包括按键防抖尚未稳定的短窗口。
+  const bool rawButton = digitalRead(kKey0Pin);
+  const bool key0MayBeActive =
+      rawButton == LOW
+      || lastRawButton_ == LOW
+      || stableButton_ == LOW
+      || rawButton != stableButton_
+      || now - debounceMs_ <= kDebounceDelayMs;
+  if (key0MayBeActive) return;
+
   drawTodoList(uiStr(UiStringId::kHintAdd), false, true);
 }
 
