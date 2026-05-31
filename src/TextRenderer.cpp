@@ -21,6 +21,12 @@ namespace {
 // Single renderer bound to the panel (Chinese build only).
 OpenFontRender g_ofr;
 
+// The panel OFR draws into, and the current glyph color. The pixel hooks below
+// are non-capturing (so they convert cleanly to std::function) and read these
+// globals instead of capturing the display reference.
+EPaper* g_disp = nullptr;
+uint16_t g_ink = 0;
+
 // Maps the bitmap "size unit" (the old setTextSize scale, ~8 px per unit) to
 // OpenFontRender pixels. Tune on hardware so Chinese glyphs visually match the
 // former bitmap sizes.
@@ -55,15 +61,22 @@ bool TextRenderer::begin(EPaper& display)
 {
   display_ = &display;
 #if VM_LANG_ZH
+  g_disp = &display;
   g_ofr.setDrawer(static_cast<TFT_eSPI&>(display));
-  // EPaper is a TFT_eSprite: it overrides the virtual drawPixel (which writes
-  // the sprite buffer) but not drawFastHLine. setDrawer binds the hooks through
-  // a TFT_eSPI& reference, so OFR's horizontal fills resolve to the base
-  // TFT_eSPI hardware path and never reach the sprite -- leaving glyph interiors
-  // blank (hollow text). Re-bind the line hook to a drawPixel loop, which is
-  // virtual and lands in the sprite, so filled runs render solid.
-  g_ofr.set_drawFastHLine([&display](int32_t hx, int32_t hy, int32_t hw, uint16_t hc) {
-    for (int32_t i = 0; i < hw; ++i) display.drawPixel(hx + i, hy, hc);
+  // The gray16 panel is a 4-bit sprite: drawPixel keeps only the low 4 bits of
+  // the color as a gray index (Sprite.cpp). OpenFontRender anti-aliases by
+  // blending fg/bg as RGB565, so the value it feeds drawPixel has a meaningless
+  // low nibble here -- the glyph comes out hollow and blurry. Override OFR's
+  // pixel hooks to paint SOLID ink (g_ink, a real gray index) for every covered
+  // pixel via the panel's own virtual drawPixel (the path MemoUI uses). This
+  // trades anti-aliasing for crisp, solid Chinese text.
+  g_ofr.set_drawPixel([](int32_t px, int32_t py, uint16_t) {
+    if (g_disp) g_disp->drawPixel(px, py, g_ink);
+  });
+  g_ofr.set_drawFastHLine([](int32_t px, int32_t py, int32_t pw, uint16_t) {
+    if (g_disp) {
+      for (int32_t i = 0; i < pw; ++i) g_disp->drawPixel(px + i, py, g_ink);
+    }
   });
   // loadFont returns non-zero on failure. The font is embedded in flash
   // (FontZH.h), so there is no filesystem to mount.
@@ -89,6 +102,9 @@ void TextRenderer::drawText(const String& text, int x, int y, int sizeUnit,
   // Never call into OpenFontRender without a loaded font: it dereferences a
   // null face and crashes. Degrade by skipping the glyphs instead.
   if (!fontReady_) return;
+
+  // Solid ink the pixel hooks paint for this glyph run.
+  g_ink = color;
 
   const unsigned px = static_cast<unsigned>(sizeUnit * VM_ZH_PX_PER_UNIT);
   g_ofr.setFontSize(px);
