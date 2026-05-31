@@ -59,19 +59,21 @@ prompted to return in Chinese regardless of the spoken language. Language is a
 build-time choice (the `-D VM_UI_LANG_ZH` flag): the English and Chinese
 firmwares are separate builds, never switched at runtime.
 
-The Chinese build renders text through OpenFontRender using a TrueType font in
-SPIFFS, so flashing is **two steps**:
+The Chinese build renders text through OpenFontRender. The font is embedded in
+the firmware: a pre-build hook (`scripts/gen_font.py`) converts
+`data/test_ZH.ttf` into `src/FontZH.h` automatically, so it flashes in a single
+step like the other devices (no SPIFFS / `uploadfs`):
 
 ```sh
-pio run -e reterminal_e1003_zh -t uploadfs   # writes data/test_ZH.ttf to SPIFFS
-pio run -e reterminal_e1003_zh -t upload     # writes the firmware
+pio run -e reterminal_e1003_zh -t upload
 ```
 
 Notes:
 
-- The font `data/test_ZH.ttf` is a subset Source-Han font (~833 KB). Characters
-  not in the subset render blank. To use a different font, drop it in `data/`,
-  point the load path in `TextRenderer.cpp` at it, and re-run `-t uploadfs`.
+- The font `data/test_ZH.ttf` is a subset Source-Han font (~833 KB), embedded
+  into the binary as `src/FontZH.h` (git-ignored, regenerated on build).
+  Characters outside the subset render blank. To use a different font, replace
+  `data/test_ZH.ttf` and rebuild — the header regenerates automatically.
 - Glyph size is controlled by `VM_ZH_PX_PER_UNIT` in `TextRenderer.cpp`; tune it
   on hardware so Chinese text matches the former bitmap sizes.
 - Switching a device between the English and Chinese firmware clears the saved
@@ -101,7 +103,7 @@ the module they care about:
 | `src/DateLabels.h`      | Header-only pure C++ helpers: `vmDayDistance()` and English/Chinese `vmDateChipLabel()`. |
 | `src/UiLang.h`          | Header-only: compile-time language switch (`VM_LANG_ZH`) and the English/Chinese fixed-string table (`uiStr`). |
 | `src/TextRenderer.*`    | Text rendering facade. English build draws with the Seeed_GFX bitmap font; the Chinese build (`VM_LANG_ZH`) draws with OpenFontRender + a SPIFFS TrueType font. |
-| `src/OfrSpiffs.h`       | SPIFFS file hooks for OpenFontRender (Chinese build only). |
+| `scripts/gen_font.py`   | Pre-build hook (Chinese env): embeds `data/test_ZH.ttf` into `src/FontZH.h`. |
 
 ## Contributing
 

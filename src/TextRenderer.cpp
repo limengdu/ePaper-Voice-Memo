@@ -4,10 +4,17 @@
 
 #if VM_LANG_ZH
 
-#include <SPIFFS.h>
-
 #include "OpenFontRender.h"
-#include "OfrSpiffs.h"   // OFR_f* hooks + globals; this TU only.
+#include "FontZH.h"   // const unsigned char vm_font_zh[]; vm_font_zh_len
+
+// OpenFontRender's FileSupport.h declares these file hooks for its file-based
+// loadFont path. We load the font from memory and never open a file, but the
+// symbols must still resolve at link time, so provide inert stubs.
+FT_FILE *OFR_fopen(const char *, const char *) { return nullptr; }
+void OFR_fclose(FT_FILE *) {}
+size_t OFR_fread(void *, size_t, size_t, FT_FILE *) { return 0; }
+int OFR_fseek(FT_FILE *, long int, int) { return -1; }
+long int OFR_ftell(FT_FILE *) { return -1; }
 
 namespace {
 
@@ -48,16 +55,12 @@ bool TextRenderer::begin(EPaper& display)
 {
   display_ = &display;
 #if VM_LANG_ZH
-  if (!SPIFFS.begin()) {
-    fontReady_ = false;
-    Serial1.println("[ofr] SPIFFS mount failed");
-    return false;
-  }
   g_ofr.setDrawer(static_cast<TFT_eSPI&>(display));
-  // loadFont returns non-zero on failure.
-  if (g_ofr.loadFont("/test_ZH.ttf")) {
+  // loadFont returns non-zero on failure. The font is embedded in flash
+  // (FontZH.h), so there is no filesystem to mount.
+  if (g_ofr.loadFont(vm_font_zh, vm_font_zh_len)) {
     fontReady_ = false;
-    Serial1.println("[ofr] loadFont /test_ZH.ttf failed");
+    Serial1.println("[ofr] loadFont (embedded) failed");
     return false;
   }
   g_ofr.showCredit();   // FreeType FTL license attribution
