@@ -94,6 +94,8 @@ class MemoUI {
   // Shared text helpers.
   void drawWrapped(const String& text, int x, int y, int maxW, int lineH,
                    int textSize, uint16_t color, int maxLines);
+  void drawWrappedRight(const String& text, int rightX, int bottomY, int maxW,
+                        int lineH, int textSize, uint16_t color, int maxLines);
 
   void drawClipboardLogo(int x, int y, int size, uint16_t color);
   void drawBatteryIcon(int x, int y, int w, int h, int percent, uint16_t color);

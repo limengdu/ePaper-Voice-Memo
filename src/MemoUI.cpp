@@ -155,6 +155,46 @@ void MemoUI::drawWrapped(const String& text, int x, int y, int maxW,
   }
 }
 
+void MemoUI::drawWrappedRight(const String& text, int rightX, int bottomY,
+                              int maxW, int lineH, int textSize,
+                              uint16_t color, int maxLines)
+{
+  auto utf8Len = [&](size_t i) -> size_t {
+    const uint8_t c = static_cast<uint8_t>(text[i]);
+    if ((c & 0x80) == 0) return 1;
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;
+  };
+
+  String lines[2];
+  const int cappedLines = min(maxLines, 2);
+  int count = 0;
+  String line;
+  for (size_t i = 0; i < static_cast<size_t>(text.length()) && count < cappedLines; ) {
+    const size_t n = utf8Len(i);
+    const String token = text.substring(i, i + n);
+    i += n;
+    if (token == "\r" || token == "\n") continue;
+
+    const String candidate = line + token;
+    if (line.length() > 0 && renderer_.measureText(candidate, textSize) > maxW) {
+      lines[count++] = line;
+      line = token;
+    } else {
+      line = candidate;
+    }
+  }
+  if (count < cappedLines && line.length() > 0) lines[count++] = line;
+
+  for (int i = 0; i < count; i++) {
+    const int y = bottomY - (count - 1 - i) * lineH;
+    renderer_.drawText(lines[i], rightX, y, textSize,
+                       TextAlign::BottomRight, color, kUiBg);
+  }
+}
+
 void MemoUI::drawStatus(const char* badge, const String& title, const String& body,
                         const String& hint, bool recording, float seconds)
 {
@@ -468,12 +508,14 @@ void MemoUI::drawTodoList(MemoStore& store, RtcClock& rtc,
   }
 
   // ---- Footer ----
-  const int quoteX = margin + renderer_.measureText(hint, 3) + 56;
-  const int quoteW = w - margin - quoteX;
-  renderer_.drawText(hint, margin, h - 36, 3,
+  const int footerTextSize = 3;
+  const int footerY = h - 36;
+  const int quoteW = w - margin * 2 - renderer_.measureText(hint, footerTextSize) - 56;
+  renderer_.drawText(hint, margin, footerY, footerTextSize,
                      TextAlign::BottomLeft, kUiText, kUiBg);
   if (quote.length() > 0 && quoteW > 80) {
-    drawWrapped(quote, quoteX, h - 76, quoteW, 34, 3, kUiMuted, 2);
+    drawWrappedRight(quote, w - margin, footerY, quoteW, 34,
+                     footerTextSize, kUiText, 2);
   }
   display_.update();
 #else
