@@ -47,6 +47,10 @@ The idle screen redraws every 5 minutes. That refresh updates the clock, date, o
 
 If WiFi or the API is unavailable, the device keeps the old quote. If no quote has ever been fetched, it shows a local fallback line.
 
+### RTC Build-Time Seeding
+
+On boot, the firmware reads the onboard PCF8563 RTC. If the RTC is invalid or earlier than the firmware build time by more than 60 seconds, the device writes the build time into the RTC. If the RTC is already later than the build time, it is left alone so a normal reboot after upload does not rewind the clock.
+
 ### Persistent Storage
 
 Reminders are stored in ESP32-S3 NVS. A reboot or power cycle restores the list automatically. Switching between English and Chinese firmware clears the old language's reminders so the list does not mix languages.

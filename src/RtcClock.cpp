@@ -2,6 +2,7 @@
 
 #include <Wire.h>
 
+#include "ClockSync.h"
 #include "UiLang.h"
 
 namespace {
@@ -46,6 +47,40 @@ void getCompileTime(int& year, int& month, int& day,
   hour = atoi(__TIME__);
   minute = atoi(__TIME__ + 3);
   second = atoi(__TIME__ + 6);
+}
+
+time_t makeLocalEpoch(int year, int month, int day,
+                      int hour, int minute, int second)
+{
+  struct tm t = {};
+  t.tm_year = year - 1900;
+  t.tm_mon  = month - 1;
+  t.tm_mday = day;
+  t.tm_hour = hour;
+  t.tm_min  = minute;
+  t.tm_sec  = second;
+  t.tm_isdst = -1;
+  return mktime(&t);
+}
+
+time_t rtcTimeToEpoch(const VoiceMemoRtcTime& rt)
+{
+  if (!rt.voltageOK) return 0;
+  if (rt.year < 2000 || rt.year > 2099) return 0;
+  if (rt.month < 1 || rt.month > 12) return 0;
+  if (rt.day < 1 || rt.day > 31) return 0;
+  if (rt.hour < 0 || rt.hour > 23) return 0;
+  if (rt.minute < 0 || rt.minute > 59) return 0;
+  if (rt.second < 0 || rt.second > 59) return 0;
+  return makeLocalEpoch(rt.year, rt.month, rt.day,
+                        rt.hour, rt.minute, rt.second);
+}
+
+time_t getBuildEpoch()
+{
+  int year, month, day, hour, minute, second;
+  getCompileTime(year, month, day, hour, minute, second);
+  return makeLocalEpoch(year, month, day, hour, minute, second);
 }
 
 }  // namespace
@@ -167,31 +202,31 @@ bool RtcClock::begin(uint8_t sdaPin, uint8_t sclPin)
     return false;
   }
 
-  if (!voltageOK()) {
-    // The VL flag is set on a fresh battery. Seed from compile time so the UI
-    // does not show "----" before the user calls setTime() externally.
-    seedFromBuildTime();
+  VoiceMemoRtcTime rt = {};
+  if (!readTime(rt)) {
+    available_ = false;
+    return false;
   }
 
-  VoiceMemoRtcTime rt = {};
-  available_ = readTime(rt) && rt.voltageOK;
+  const time_t rtcEpoch = rtcTimeToEpoch(rt);
+  const time_t buildEpoch = getBuildEpoch();
+  if (vmShouldSyncRtcFromBuildTime(rtcEpoch, buildEpoch,
+                                   kBuildSyncThresholdSeconds)) {
+    seedFromBuildTime();
+    if (readTime(rt) && rtcTimeToEpoch(rt) > 0) {
+      Serial1.println("[rtc] seeded from firmware build time");
+    }
+  }
+
+  available_ = rtcTimeToEpoch(rt) > 0;
   return available_;
 }
 
 time_t RtcClock::nowEpoch()
 {
   VoiceMemoRtcTime rt = {};
-  if (!available_ || !readTime(rt) || !rt.voltageOK) return 0;
-
-  struct tm t = {};
-  t.tm_year = rt.year - 1900;
-  t.tm_mon  = rt.month - 1;
-  t.tm_mday = rt.day;
-  t.tm_hour = rt.hour;
-  t.tm_min  = rt.minute;
-  t.tm_sec  = rt.second;
-  t.tm_isdst = -1;
-  return mktime(&t);
+  if (!available_ || !readTime(rt)) return 0;
+  return rtcTimeToEpoch(rt);
 }
 
 String RtcClock::nowTimeLabel()

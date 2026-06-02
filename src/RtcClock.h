@@ -55,6 +55,7 @@ class RtcClock {
   static constexpr uint8_t kRegCtrl2   = 0x01;
   static constexpr uint8_t kRegSeconds = 0x02;
   static constexpr uint8_t kRegClkout  = 0x0D;
+  static constexpr time_t kBuildSyncThresholdSeconds = 60;
 
   bool readRegs(uint8_t reg, uint8_t* buf, size_t len);
   bool writeReg(uint8_t reg, uint8_t value);
