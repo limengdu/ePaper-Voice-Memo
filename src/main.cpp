@@ -22,44 +22,84 @@
  */
 
 #include <Arduino.h>
+#include <Preferences.h>
+#if __has_include("secrets.h")
 #include "secrets.h"
+#endif
+#include "UiLang.h"
 #include "VoiceMemoApp.h"
 
-static const VoiceMemoConfig kConfig = {
-  .wifiSsid     = VM_WIFI_SSID,
-  .wifiPassword = VM_WIFI_PASSWORD,
+#ifndef VM_WIFI_SSID
+#define VM_WIFI_SSID ""
+#endif
+#ifndef VM_WIFI_PASSWORD
+#define VM_WIFI_PASSWORD ""
+#endif
+#ifndef VM_GROQ_API_KEY
+#define VM_GROQ_API_KEY ""
+#endif
 
-  .speech = {
-    .provider = VM_SPEECH_OPENAI_COMPATIBLE,
-    .url      = "https://api.groq.com/openai/v1/audio/transcriptions",
-    .apiKey   = VM_GROQ_API_KEY,
-    .model    = "whisper-large-v3-turbo",
-    .language = "",
-  },
+static String nvsWifiSsid;
+static String nvsWifiPass;
+static String nvsApiKey;
 
-  .memo = {
-    .provider = VM_MEMO_OPENAI_COMPATIBLE,
-    .url      = "https://api.groq.com/openai/v1/chat/completions",
-    .apiKey   = VM_GROQ_API_KEY,
-    .model    = "llama-3.3-70b-versatile",
-  },
+static void loadNvsCredentials()
+{
+  Preferences prefs;
+  if (!prefs.begin("config", true)) {
+    nvsWifiSsid = VM_WIFI_SSID;
+    nvsWifiPass = VM_WIFI_PASSWORD;
+    nvsApiKey   = VM_GROQ_API_KEY;
+    return;
+  }
+  nvsWifiSsid = prefs.getString("wifiSsid", VM_WIFI_SSID);
+  nvsWifiPass = prefs.getString("wifiPass", VM_WIFI_PASSWORD);
+  nvsApiKey   = prefs.getString("apiKey", VM_GROQ_API_KEY);
+  prefs.end();
+}
 
-  .audio = {
-    .sampleRate       = 16000,
-    .maxRecordSeconds = 20,
-  },
+static VoiceMemoConfig buildConfig()
+{
+  return {
+    .wifiSsid     = nvsWifiSsid.c_str(),
+    .wifiPassword = nvsWifiPass.c_str(),
 
-  .httpTimeoutMs = 45000,
-};
+    .speech = {
+      .provider = VM_SPEECH_OPENAI_COMPATIBLE,
+      .url      = "https://api.groq.com/openai/v1/audio/transcriptions",
+      .apiKey   = nvsApiKey.c_str(),
+      .model    = "whisper-large-v3-turbo",
+      .language = VM_LANG_ZH ? "zh" : "",
+    },
 
-VoiceMemoApp app(kConfig);
+    .memo = {
+      .provider = VM_MEMO_OPENAI_COMPATIBLE,
+      .url      = "https://api.groq.com/openai/v1/chat/completions",
+      .apiKey   = nvsApiKey.c_str(),
+      .model    = "llama-3.3-70b-versatile",
+    },
+
+    .audio = {
+      .sampleRate       = 16000,
+      .maxRecordSeconds = 20,
+    },
+
+    .httpTimeoutMs = 45000,
+  };
+}
+
+static VoiceMemoApp* app;
 
 void setup()
 {
-  app.begin();
+  loadNvsCredentials();
+  static VoiceMemoConfig cfg = buildConfig();
+  static VoiceMemoApp instance(cfg);
+  app = &instance;
+  app->begin();
 }
 
 void loop()
 {
-  app.loop();
+  if (app) app->loop();
 }

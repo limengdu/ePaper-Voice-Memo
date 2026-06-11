@@ -33,3 +33,6 @@ __pycache__/
 
 # Claude local settings
 .claude/settings.local.json
+
+# Local backup of the nested repository metadata
+.git-backup/
